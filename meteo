@@ -1,0 +1,87 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# 
+__author__ = "Jerome Kieffer"
+__license__ = "MIT"
+__date__ = "16/09/2015" 
+
+import os,sys
+from yoctopuce import yocto_api 
+from yoctopuce import yocto_humidity 
+from yoctopuce import yocto_temperature 
+from yoctopuce import yocto_pressure 
+
+
+def die(msg):
+    sys.exit(msg+' (check USB cable)')
+
+
+def config():
+    txt="""multigraph meteo_temperature
+graph_title Yoctopuce meteo temperature 
+graph_vlabel deg C
+graph_category sensors
+graph_info This graph shows the temperature sensor of the Yoctopuce meteo
+
+temp.info Temperature
+temp.min -10
+temp.max 40
+temp.label temp
+
+multigraph meteo_humidity
+graph_title Yoctopuce meteo humidity 
+graph_vlabel % Relative humidity
+graph_category sensors
+graph_info This graph shows the relative humidity sensor of the Yoctopuce meteo
+
+rh.info Relative humidity
+rh.min 0
+rh.max 100
+rh.label humidity
+
+multigraph meteo_pressure
+graph_title Yoctopuce meteo pressure
+graph_vlabel Presure (hPa)
+graph_category sensors
+graph_info This graph shows the presure sensor of the Yoctopuce meteo
+
+pres.info Relative humidity
+pres.min 950
+pres.max 1050
+pres.label pressure
+"""
+    print(txt)
+
+
+def main():
+    errmsg = yocto_api.YRefParam()
+    # Setup the API to use local USB devices
+    if yocto_api.YAPI.RegisterHub("usb", errmsg)!= yocto_api.YAPI.SUCCESS:
+        sys.exit("init error: %s"%errmsg.value)
+    
+    # retreive any humidity sensor
+    sensor = yocto_humidity.YHumidity.FirstHumidity()
+    if sensor is None :
+        die('No module connected')
+    m = sensor.get_module()
+    target = m.get_serialNumber()
+
+    m = yocto_api.YModule.FindModule(target)
+
+    if not m.isOnline(): 
+        die('device not connected')
+
+    humSensor = yocto_humidity.YHumidity.FindHumidity(target+'.humidity')
+    pressSensor = yocto_pressure.YPressure.FindPressure(target+'.pressure')
+    tempSensor = yocto_temperature.YTemperature.FindTemperature(target+'.temperature')
+
+
+    print('temp.value %4.1f' % tempSensor.get_currentValue())
+    print("rh.value %4.1f" % humSensor.get_currentValue())
+    print("pres.value %4.0f" % pressSensor.get_currentValue())
+
+if __name__ == "__main__":
+    if len(sys.argv)>1 and sys.argv[1] == "config":
+        config()
+    else:
+        main()
