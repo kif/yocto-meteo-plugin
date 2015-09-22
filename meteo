@@ -3,7 +3,7 @@
 # 
 __author__ = "Jerome Kieffer"
 __license__ = "MIT"
-__date__ = "16/09/2015" 
+__date__ = "23/09/2015" 
 
 import os,sys
 from yoctopuce import yocto_api 
@@ -73,13 +73,13 @@ def main(what):
 
     if "humidity" in what:
         humSensor = yocto_humidity.YHumidity.FindHumidity(target+'.humidity')
-        print("rh.value %4.1f" % humSensor.get_currentValue())
+        print("rh.value %5.2f" % humSensor.get_currentValue())
     elif "pressure" in what:
         pressSensor = yocto_pressure.YPressure.FindPressure(target+'.pressure')
-        print("pres.value %4.0f" % pressSensor.get_currentValue())
+        print("pres.value %6.1f" % pressSensor.get_currentValue())
     elif "temperature" in what:
         tempSensor = yocto_temperature.YTemperature.FindTemperature(target+'.temperature')
-        print('temp.value %4.1f' % tempSensor.get_currentValue())
+        print('temp.value %5.2f' % tempSensor.get_currentValue())
 
 if __name__ == "__main__":
     if len(sys.argv)>1 and sys.argv[1] == "config":
