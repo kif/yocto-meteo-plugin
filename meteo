@@ -45,6 +45,7 @@ graph_title Yoctopuce meteo pressure
 graph_vlabel Pressure (hPa)
 graph_category sensors
 graph_info This graph shows the presure sensor of the Yoctopuce meteo
+graph_args --base 1000 -l 950 -u 1050 --rigid
 pres.info Relative humidity %
 pres.min 950
 pres.max 1050
