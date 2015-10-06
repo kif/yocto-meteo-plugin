@@ -1,0 +1,18 @@
+#!/bin/bash
+case $1 in
+   config)
+           cat <<'EOM'
+graph_title Detected events
+graph_vlabel events per ${graph_period}
+graph_category sensors
+event.label events
+event.type DERIVE
+event.min 0
+event.info Number of events detected.
+EOM
+    exit 0;;
+esac
+
+printf "event.value "
+wc -l /var/log/pir.log |cut -d\  -f1
+
