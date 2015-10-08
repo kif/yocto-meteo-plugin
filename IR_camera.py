@@ -9,6 +9,7 @@ import RPi.GPIO as GPIO
 import daemon
 import signal
 
+spy = None
 
 class Spy(object):
     def __init__(self, folder, led_id, pir_id):
@@ -82,7 +83,7 @@ class Spy(object):
         Function called for every raise on the PIR sensor pin
         """
         self.light(True)
-        self.log(str(what))
+        self.log("Raising pin %s"%(what))
         for i in range(self.max_pict):
             if GPIO.input(self.pir):
                  self.capture()
@@ -117,6 +118,7 @@ if __name__ == "__main__":
     def test(delay):
         spy = Spy(folder, led, sensor)
         spy.setup()
+        spy.shoot()
         while True:
            time.sleep(delay)
            spy.log("test")
@@ -125,21 +127,27 @@ if __name__ == "__main__":
         if os.path.exists(pid_file):
             print("pid file %s exists, process already running under pid: %s"%(pid_file,open(pid_file).read()))
             sys.exit()
-
+        global spy
         spy = Spy(folder, led, sensor)
         with daemon.DaemonContext():
+            try:
+                from rfoo.utils import rconsole
+                rconsole.spawn_server()
+            except:
+                pass
             with open(pid_file,"w") as f:
                 f.write(str(os.getpid()))
             spy.setup()
+            spy.shoot()
             while True:
-                time.sleep(10)
+                time.sleep(60*60)
                 spy.log("ping")
     
     def stop():
         if os.path.exists(pid_file):
             pid = int(open(pid_file).read())
-            os.kill(pid,signal.SIGTERM)
             os.unlink(pid_file)
+            os.kill(pid,signal.SIGTERM)
         else:
             print("Process not running")
 
@@ -160,3 +168,4 @@ if __name__ == "__main__":
     else:
         print("usage: %s start|stop|restart|test" % sys.argv[0])
         sys.exit(2)
+
