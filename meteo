@@ -3,11 +3,12 @@
 # 
 __author__ = "Jerome Kieffer"
 __license__ = "MIT"
-__date__ = "23/09/2015" 
+__date__ = "09/10/2015" 
 
 height = 223
-corr_pres = (1 - 2.25577e-5*height)**-5.25588
-"ref: http://www.engineeringtoolbox.com/air-altitude-pressure-d_462.html"
+#corr_pres = (1 - 2.25577e-5*height)**-5.25588
+#"ref: http://www.engineeringtoolbox.com/air-altitude-pressure-d_462.html"
+"http://www.yoctopuce.com/FR/article/station-meteo-affichage"
 
 import os,sys
 
@@ -89,6 +90,9 @@ def main(what):
 
     if "pressure" in what:
         pressSensor = yocto_pressure.YPressure.FindPressure(target+'.pressure')
+        tempSensor = yocto_temperature.YTemperature.FindTemperature(target+'.temperature')
+        temp_abs = 273.15 + tempSensor.get_currentValue()
+        corr_pres = ((temp_abs + 0.0065*height)/temp_abs) ** 5.2561
         print("pres.value %6.1f" % (pressSensor.get_currentValue()*corr_pres))
     else:
         import Adafruit_DHT
