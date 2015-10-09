@@ -140,7 +140,7 @@ if __name__ == "__main__":
             spy.setup()
             spy.shoot()
             while True:
-                time.sleep(60*60)
+                time.sleep(60*60*24)
                 spy.log("ping")
     
     def stop():
