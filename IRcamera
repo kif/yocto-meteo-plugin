@@ -1,4 +1,13 @@
 #!/usr/bin/python 
+### BEGIN INIT INFO
+# Provides:        IRcamera
+# Required-Start:  $syslog
+# Required-Stop:   fs $syslog
+# Default-Start:   2 3 4 5
+# Default-Stop: 
+# Short-Description: Camera watching birds
+### END INIT INFO
+
 import sys
 import os
 import time
@@ -22,17 +31,19 @@ class Spy(object):
         self.delay = 1.0
         self.logfile = "/var/log/pir.log"
         self.sem = Semaphore()
-        self.resolution = (2592, 1944)
+        self.resolution = (1296,972) #(2592, 1944)
         self.iso = 800
 
     def light(self, turn=None):
         """
         set to True to switch on the light
         """
-        if turn:
-             GPIO.output(self.led, GPIO.HIGH)
+        what = GPIO.HIGH if turn else GPIO.LOW
+        if "__len__" in dir(self.led):
+            for led in self.led:
+                GPIO.output(led, what)
         else:
-             GPIO.output(self.led, GPIO.LOW)
+            GPIO.output(self.led, what)
 
     def capture(self):
         """
@@ -101,8 +112,13 @@ class Spy(object):
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         GPIO.setup(self.pir, GPIO.IN, GPIO.PUD_DOWN)
-        GPIO.setup(self.led, GPIO.OUT)
-        GPIO.output(self.led, GPIO.LOW)
+        if "__len__" in dir(self.led):
+            for led in self.led:
+                GPIO.setup(led, GPIO.OUT)
+                GPIO.output(led, GPIO.LOW)
+        else:
+            GPIO.setup(self.led, GPIO.OUT)
+            GPIO.output(self.led, GPIO.LOW)
         self.cam = picamera.PiCamera()
         self.cam.resolution = self.resolution
         self.cam.iso = self.iso
@@ -118,7 +134,7 @@ class Spy(object):
 if __name__ == "__main__":
     folder = "/home/jerome/www"
     sensor = 23
-    led = 18
+    led = 18,16
     pid_file = '/var/run/pir.pid'
     
     def test(delay):
