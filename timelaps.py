@@ -12,7 +12,7 @@ resolution = (1296, 972)
 fps = 2
 bining = (8, 4)
 thres = 20
-points = 20
+points = 60
 delay = 3600
 
 
