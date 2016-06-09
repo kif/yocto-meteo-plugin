@@ -15,13 +15,14 @@ import json
 
 class TimeLaps(object):
     def __init__(self, resolution=(2592, 1944), fps=1, delay=360, 
-                 folder=".", avg_gains=200, avg_speed=5, config_file="parameters.json"):
+                 folder=".", avg_gains=200, avg_speed=25, config_file="parameters.json"):
         self.resolution = resolution
         self.fps = fps
         self.delay = delay
         self.folder = os.path.abspath(folder)
         self.avg_gains = avg_gains # time laps over which average gains
         self.avg_speeds = avg_speed # time laps over which average speed
+        self.avg_speed_nb_img = 4
         self.config_file = os.path.abspath(config_file)
         self.red_gains = []
         self.blue_gains = []
@@ -68,6 +69,8 @@ class TimeLaps(object):
         """
         if not self.is_valid():
             print("Skipped, low light Speed %.3f/iso%.0f"%(self.last_speed, self.last_gain))
+            self.last_img = time.time()
+            self.next_img = self.last_img + self.delay
             return     
         ns = self.next_speed
         iso = 100
@@ -107,8 +110,8 @@ class TimeLaps(object):
         self.blue_gains.append(b)
         self.speeds.append(math.log(ls, 2.0))
         if len(self.red_gains) > self.avg_gains:
-            red_gains = red_gains[-self.avg_gains:]
-            blue_gains = blue_gains[-self.avg_gains:]
+            self.red_gains = self.red_gains[-self.avg_gains:]
+            self.blue_gains = self.blue_gains[-self.avg_gains:]
         if len(self.speeds) > self.avg_speeds:
            self.speeds = self.speeds[-self.avg_speeds:]
         rg = sum(self.red_gains)/len(self.red_gains)
@@ -130,6 +133,6 @@ if __name__ == "__main__":
     while True:
         tl.capture()
         while time.time() < tl.next_img:
-            time.sleep(2.0*tl.delay/tl.avg_speeds)
+            time.sleep(1.0*tl.avg_speed_nb_img*tl.delay/tl.avg_speeds)
             tl.measure()
 
