@@ -1,0 +1,12 @@
+.img-container {
+ width: 640px;
+ height: 480px;
+ padding: 0px;
+ margin: 0px;
+ border: solid 1px black;
+ }
+
+p {
+ margin: 0px;
+ padding: 0px;
+ }
