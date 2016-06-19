@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-
-#from picamera.array import PiYUVArray
+from __future__ import division, print_function
 from picamera import PiCamera
 from picamera.array import PiRGBArray
 from PIL import Image
@@ -14,10 +13,81 @@ import math
 from fractions import Fraction
 import json
 import pyexiv2
+from collections import namedtuple
+
+position = namedtuple("pan", "tilt")
+
+trajectory={
+"delay": 60,
+"avg_awb":200,
+"avg_speed":25,
+"avg_speed_nb_img":2,
+"trajectory": [
+ {"tilt":45,
+  "pan":90,
+  "stay": 10,
+  "move": 10},
+ {"tilt":35,
+  "pan":70,
+  "stay": 10,
+  "move": 10},
+ {"tilt":00,
+  "pan":+20,
+  "stay": 10,
+  "move": 10},
+ {"tilt":00,
+  "pan":-40,
+  "stay": 10,
+  "move": 10},
+ ]
+}
+class Trajectory(object):
+    def __init__(self, config=None, json_file=None):
+        self.start_time = time.time()
+        self.config = config
+        if json_file:
+            self.load_config(json_file)
+
+    def load_file(self, filename):
+        with open(filename) as jf:
+            data = jf.read()
+        config = json.load(data)
+        if "trajectory" in config:
+           self.config = config["trajectory"]
+        else:
+           self.config = config
+    def goto(self, when):
+        """move the camera to the position it need to be at a given timestamp"""
+    def calc_pos(self, when):
+        """Calculate the position it need to be at a given timestamp"""
+        last_pos = position(0,90)
+        remaining = when
+        last_timestamp = 0
+        for point in self.config:
+            next_pos = position(point.get("pan",0), point.get("tilt",0))
+            remaining -= point.get("move")
+            if remaining < 0:
+                break
+            remaining -= point.get("stay")
+            if remaining < 0:
+                return next_pos
+            last_timestamp = remaining
+        else:
+            #we ran out pof points: stay on the last
+            return next_pos
+        print(remaining)
+        delta = last_timestamp - remaining
+        delta_p = next_pos.pan - last_pos.pan
+        delta_t = next_pos.tilt - last_po.tilt
+        adv = - remaining / delta
+        tilt = last_po.tilt + adv * delta_t
+        pan = last_pos.pan + adv * delta_p
+        return position(pan,tilt)
 
 class TimeLaps(object):
     def __init__(self, resolution=(2592, 1944), fps=1, delay=360, 
                  folder=".", avg_gains=200, avg_speed=25, config_file="parameters.json"):
+        self.start_time = time.time()
         self.resolution = resolution
         self.fps = fps
         self.delay = delay
@@ -138,13 +208,13 @@ class TimeLaps(object):
        return self.last_speed/self.last_gain >=1.5 
     
 if __name__ == "__main__":
-    tl = TimeLaps()
-    print("Warmup ...")
-    time.sleep(2)
-    tl.measure()
-    while True:
-        tl.capture()
-        while time.time() < tl.next_img:
-            time.sleep(1.0*tl.avg_speed_nb_img*tl.delay/tl.avg_speeds)
-            tl.measure()
-
+#    tl = TimeLaps()
+#    print("Warmup ...")
+#    time.sleep(2)
+#    tl.measure()
+#    while True:
+#        tl.capture()
+#        while time.time() < tl.next_img:
+#            time.sleep(1.0*tl.avg_speed_nb_img*tl.delay/tl.avg_speeds)
+#            tl.measure()
+    pass
