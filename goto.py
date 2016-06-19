@@ -7,7 +7,7 @@ from __future__ import division
 import time
 import sys
 
-# Import the PCA9685 module.
+import Adafruit_PCA9685# Import the PCA9685 module.
 import Adafruit_PCA9685
 
 
@@ -33,8 +33,8 @@ pwm.set_pwm_freq(60)
 def angle(val):
     '''calculate the pwm for requested angle
     angle goes from -90 to +90 deg'''
-    return int(servo_min + (val + 90.0) * (servo_max - servo_min) / 180.0)
-
+    return int(round(servo_min + (90.0 - val) * (servo_max - servo_min) / 180.0)
+)
 def parse(args=None):
     from argparse import ArgumentParser
     if args is None:
@@ -53,4 +53,4 @@ tilt, pan = parse()
 
 print('Moving servos of tilt-pan camera to zenith tilt=%.1f pan=%.1f'%(tilt, pan))
 pwm.set_pwm(servo_pan, 0, angle(pan))
-pwm.set_pwm(servo_tilt, 0, angle(-tilt))
+pwm.set_pwm(servo_tilt, 0, angle(tilt))
