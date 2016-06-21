@@ -1,0 +1,32 @@
+{
+  "delay": 60, 
+  "avg_speed": 25, 
+  "avg_speed_nb_img": 2, 
+  "avg_awb": 200, 
+  "trajectory": [
+    {
+      "tilt": 45, 
+      "move": 10, 
+      "pan": 90, 
+      "stay": 10
+    }, 
+    {
+      "tilt": 35, 
+      "move": 10, 
+      "pan": 70, 
+      "stay": 10
+    }, 
+    {
+      "tilt": 0, 
+      "move": 10, 
+      "pan": 20, 
+      "stay": 10
+    }, 
+    {
+      "tilt": 0, 
+      "move": 10, 
+      "pan": -40, 
+      "stay": 10
+    }
+  ]
+}

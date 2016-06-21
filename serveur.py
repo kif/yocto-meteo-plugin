@@ -7,85 +7,107 @@ import glob
 import bottle
 import threading
 from argparse import ArgumentParser
+import inotify.adapters
 
-parser = ArgumentParser("serveur", description="open a web server on a given directory")
-parser.add_argument("-t", "--timer", help="delay before refreshing directory list", type=int, default=30)
-args = parser.parse_args()
 
-TIMER = args.timer
-sem = threading.Semaphore()
 bottle.debug(True)
 root = os.path.dirname(os.path.abspath(__file__))
-img_dir = "images"
-all_images = glob.glob("%s/*/*.jpg"%img_dir)
-all_images.sort()
 
-def update_all_images():
-    #print("update -->%s images"%len(all_images))
-    _, last_day, last_img = all_images[-1].split(os.sep)
-    days = os.listdir(img_dir)
-    days.sort()
-    try:
-        start = days.index(last_day)
-    except exception as err:
-        print("error in finding last_day: %s"%err)
-    else:
-        with sem:
-            for day in days[start:]:
-                times = os.listdir(os.path.join(img_dir,day))
-                times.sort()
-                for one in times:
-                    if not one.endswith(".jpg"):
-                        continue
-                    full = os.path.join(img_dir,day, one)
-                    if not full in all_images:
-                        all_images.append(full)
-    start_timer()
+class Server(object):
+    def __init__(self, img_dir="images", ip="0.0.0.0", port=80, timer=30):
+        self.img_dir = img_dir
+        self.ip = ip
+        self.port = port
+        self.timer = timer
+        self.all_images = []
+        self.common_files = os.path.join( os.path.dirname(os.path.abspath(__file__)), "bottle")
+        self.bottle = bottle.Bottle()
+        self.setup_routes()
 
-def start_timer():
-    threading.Timer(TIMER, update_all_images).start()
+    def update_all_images(self):
+        self.all_images = [ i for i in os.listdir(self.img_dir) if i.endswith(".jpg")]
+        self.all_images.sort()
+        threading.Thread(target=self.start_notify).start()
 
-@bottle.route('/css/:filename')
-def render_css(filename):
-    return bottle.static_file(filename, root=root)
+    def start_notify(self):
+        i = inotify.adapters.Inotify()
+        i.add_watch(self.img_dir)
+        try:
+            for event in i.event_gen():
+                if event is not None:
+                    header, type_names, watch_path, filename = event
+                    if watch_path == self.img_dir and "IN_CLOSE_WRITE" in type_names and filename.endswith(".jpg"):
+                        if filename != self.all_images[-1]:
+                            self.all_images.append(filename)
+        finally:
+            i.remove_watch(self.img_dir)
 
-@bottle.route('/robots.txt')
-def robots():
-    return bottle.static_file("robots.txt", root=root)
+    def setup_routes(self):
+        self.bottle.route('/css/:filename', callback=self.render_css)
+        self.bottle.route('/robots.txt', callback=self.robots)
+        self.bottle.route('/images/:filename', callback=self.server_static)
+        self.bottle.route('/previous', callback=self.previous)
+        self.bottle.route('/next', callback=self.next)
+        self.bottle.route('/first', callback=self.first)
+        self.bottle.route('/last', callback=self.last)
+        self.bottle.route('/', callback=self.index)
 
-@bottle.route('/images/<filepath:path>')
-def server_static(filepath):
-    #print(filepath)
-    return bottle.static_file(filepath, root=os.path.join(root,"images"))
+    def render_css(self, filename):
+        return bottle.static_file(filename, root=self.common_files)
 
-@bottle.route('/previous')
-def previous():
-    idx = (int(bottle.request.cookies.get('idx', '-1')) - 1) % len(all_images)
-    bottle.response.set_cookie('idx', str(idx))
-    return show(idx)
+    def robots(self):
+        return bottle.static_file("robots.txt", root=self.common_files)
 
-@bottle.route('/next')
-def next():
-    idx = (int(bottle.request.cookies.get('idx', '-1')) + 1) % len(all_images)
-    bottle.response.set_cookie('idx', str(idx))
-    return show(idx)
+    def server_static(self, filename):
+        return bottle.static_file(filename, root=os.path.join(root, self.img_dir))
+    
+    def previous(self):
+        idx = (int(bottle.request.cookies.get('idx', '-1')) - 1) % len(self.all_images)
+        bottle.response.set_cookie('idx', str(idx))
+        return self.show(idx)
 
-@bottle.route('/')
-def index():
-    idx = int(bottle.request.cookies.get('idx', '-1')) % len(all_images)
-    return show(idx)
+    def next(self):
+        idx = (int(bottle.request.cookies.get('idx', '-1')) + 1) % len(self.all_images)
+        bottle.response.set_cookie('idx', str(idx))
+        return self.show(idx)
 
-def show(idx):
-    #print(idx)
-    template_file = 'interface.html'
-    date_time = " ".join(os.path.splitext(all_images[idx])[0].split("/")[1:3])
-    return bottle.template(template_file,
-                           date_time=date_time,
-                           image=all_images[idx])
+    def first(self):
+        idx = 0
+        bottle.response.set_cookie('idx', str(idx))
+        return self.show(idx)
+
+    def last(self):
+        idx = len(self.all_images) - 1
+        bottle.response.set_cookie('idx', str(idx))
+        return self.show(idx)
+
+    def index(self):
+        idx = int(bottle.request.cookies.get('idx', '-1')) % len(self.all_images)
+        return self.show(idx)
+
+    def show(self, idx):
+        template_file = os.path.join(self.common_files, 'interface.html')
+        img = self.all_images[idx]
+        date_time = os.path.splitext(self.all_images[idx])[0].split("-")
+        date_time = "/".join(date_time[-2::-1])+" "+date_time[-1]
+        return bottle.template(template_file,
+                               date_time=date_time,
+                               image="images/"+img)
+
+    def start(self):
+        """Start the serveur (does not return):::"""
+        self.bottle.run(host=self.ip, port=self.port)
 
 def main():
-    start_timer()
-    bottle.run(host="0.0.0.0", port=8080)
+    parser = ArgumentParser("serveur", description="open a web server on a given directory")
+    parser.add_argument("-t", "--timer", help="delay before refreshing directory list", type=int, default=30)
+    parser.add_argument("-p", "--port", help="open specified port", type=int, default=8080)
+    parser.add_argument("-i", "--ip", help="Listen on this port", type=str, default="0.0.0.0")
+    parser.add_argument("-d", "--directory", help="Directory containing images", type=str, default="images")
+    args = parser.parse_args()
+    server = Server( img_dir=args.directory, ip=args.ip, port=args.port, timer=args.timer)
+    server.update_all_images()
+    server.start()
 
 if __name__== '__main__' :
     main()

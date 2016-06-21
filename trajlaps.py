@@ -264,7 +264,7 @@ class TimeLaps(object):
         self.save_config()
 
     def is_valid(self):
-       return self.last_speed/self.last_gain >=1.5 
+       return self.last_speed/self.last_gain >=0.4 
     
 if __name__ == "__main__":
     parser = ArgumentParser("trajlaps", 
