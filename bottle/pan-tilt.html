@@ -1,0 +1,34 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=utf-8">
+<link rel="stylesheet" href="/css/style.css" type="text/css" media="screen" charset="utf-8" />
+<title>Raspberry-Pi camera</title>
+</head>
+
+<body>
+    <!--<h1>Nichoir à mesanges</h1> -->
+<!-- Contiendra notre image -->
+<div class="actions">
+    <a href="pan_min" title="pan -90"> |&lt </a>
+    <a href="pan_m10" title="pan -=10"> &lt&lt </a>
+    <a href="pan_m01" title="pan -=01"> &lt </a>
+    pan {{pan}}
+    <a href="pan_p01" title="pan +=01"> &gt </a>
+    <a href="pan_p10" title="pan +=10"> &gt&gt </a>
+    <a href="pan_max" title="pan +90"> &gt| </a>
+    <br>
+    <a href="tilt_min" title="tilt -90"> |&lt </a>
+    <a href="tilt_m10" title="tilt -=10"> &lt&lt </a>
+    <a href="tilt_m01" title="tilt -=01"> &lt </a>
+    tilt: {{tilt}}
+    <a href="tilt_p01" title="tilt +=01"> &gt </a>
+    <a href="tilt_p10" title="tilt +=10"> &gt&gt </a>
+    <a href="tilt_max" title="tilt +90"> &gt| </a>
+    <br>
+</div><!-- actions -->
+<div class="img-container">
+     <p><img id="image" src="{{image}}" title="{{date_time}}" width=1024 /></p>
+</div><!-- img-container -->
+</body>
+</html>
