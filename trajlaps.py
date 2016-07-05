@@ -25,8 +25,8 @@ Position = namedtuple("Position", ("pan", "tilt"))
 trajectory={
 "delay": 60,
 "avg_awb":200,
-"avg_speed":25,
-"avg_speed_nb_img":2,
+"avg_speed":6,
+"avg_speed_nb_img":3,
 "trajectory": [
  {"tilt":45,
   "pan":90,
@@ -47,6 +47,7 @@ trajectory={
  ]
 }
 
+SG = [-0.2, 0, 0.2, 0.4, 0.6 ]
 class Trajectory(object):
     def __init__(self, config=None, json_file=None):
         self.start_time = time.time()
@@ -257,7 +258,9 @@ class TimeLaps(object):
            self.speeds = self.speeds[-self.avg_speed:]
         rg = sum(self.red_gains)/len(self.red_gains)
         bg = sum(self.blue_gains)/len(self.blue_gains)
-        ns = 2.0 ** (sum(self.speeds)/len(self.speeds))
+        mgspeed = sum(i*j for i,j in zip(SG, self.speeds[-len(SG):]))
+        ns = 2.0 ** (mgspeed)
+        #ns = 2.0 ** (sum(self.speeds)/len(self.speeds))
         print("len %s/%s, \t S %.3f/iso%.0f -> %.3f \t R %.3f-> %.3f \t B %.3f -> %.3f"%(len(self.red_gains),len(self.speeds), self.last_speed, 100.*self.last_gain, ns, r, rg, b, bg))
         self.next_speed = ns
         self.next_wb = rg,bg
