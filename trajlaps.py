@@ -256,6 +256,8 @@ class TimeLaps(object):
             self.blue_gains = self.blue_gains[-self.avg_awb:]
         if len(self.speeds) > self.avg_speed:
            self.speeds = self.speeds[-self.avg_speed:]
+        if len(self.speeds) < len(SG):
+            self.speeds += [self.speeds[-1]] * (len(SG) - len(self.speeds))
         rg = sum(self.red_gains)/len(self.red_gains)
         bg = sum(self.blue_gains)/len(self.blue_gains)
         mgspeed = sum(i*j for i,j in zip(SG, self.speeds[-len(SG):]))

@@ -98,7 +98,7 @@ Pan: {pan} Tilt: {tilt}
         self.bottle.route("/save", callback=self.save)
 
     def server_static(self, filename):
-        return bottle.static_file(filename, root=os.path.join(root, self.img_dir))
+        return bottle.static_file(filename, self.img_dir)
     
     def index(self):
         return self.move()
@@ -208,8 +208,8 @@ Pan: {pan} Tilt: {tilt}
         self.trajectory.append(self.current_pos)
         traj = [{"tilt": i.tilt, "pan": i.pan, "move": 60, "stay":10} 
                 for i in self.trajectory]
-        dico = {"trajectory": traj
-                "delay": 60,
+        dico = {"trajectory": traj,
+                "delay": 10,
                 "avg_awb":200,
                 "avg_speed":6,
                 "avg_speed_nb_img":3}
