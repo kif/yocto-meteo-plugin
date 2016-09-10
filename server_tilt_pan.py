@@ -4,7 +4,6 @@
 from __future__ import division, print_function
 from picamera import PiCamera
 from PIL import Image
-import Adafruit_PCA9685
 import os
 import glob
 import bottle
@@ -12,6 +11,8 @@ from argparse import ArgumentParser
 import datetime
 from collections import namedtuple
 import json
+import servo
+import time
 
 Position = namedtuple("Position", ("pan", "tilt"))
 
@@ -64,17 +65,13 @@ Pan: {pan} Tilt: {tilt}
         self.port = port
         self.bottle = bottle.Bottle()
         self.setup_routes()
-        self.pwm = Adafruit_PCA9685.PCA9685()
-        self.pwm.set_pwm_freq(60)
-        self.servo_id_tilt = 15
-        self.servo_id_pan = 14
+        self.servo_tilt = servo.tilt
+        self.servo_pan = servo.pan
         self.default_pos = Position(0, 0)
         self.current_pos = self.default_pos
         self.cam = None
         self.resolution = (1296, 972)
         self.last_image = None
-        self.servo_min = 150 # out of 4096
-        self.servo_max = 600 # out of 4096
         self.setup_cam()
 
     def setup_routes(self):
@@ -129,9 +126,9 @@ Pan: {pan} Tilt: {tilt}
         return webpage
 
     def goto_pos(self, pos):
-        pan, tilt = pos
-        self.pwm.set_pwm(self.servo_id_pan, 0, self.angle(pan))
-        self.pwm.set_pwm(self.servo_id_tilt, 0, self.angle(tilt))
+        self.servo_pan.move(pos[0])
+        self.servo_tilt.move(pos[1])
+        time.sleep(1)
 
     def pan_min(self):
         pos = Position(-90, self.current_pos.tilt)
@@ -200,9 +197,6 @@ Pan: {pan} Tilt: {tilt}
         self.cam.capture(fname)
         self.last_image = fname
         return now
-
-    def angle(self, val):
-        return int(round(self.servo_min + (90.0 - val) * (self.servo_max - self.servo_min)/180.))
 
     def save(self):
         self.trajectory.append(self.current_pos)
