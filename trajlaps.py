@@ -15,15 +15,15 @@ from fractions import Fraction
 import json
 import pyexiv2
 from collections import namedtuple
-import Adafruit_PCA9685
 from argparse import ArgumentParser
+import servo
 
 
 Position = namedtuple("Position", ("pan", "tilt"))
 
 
 trajectory={
-"delay": 60,
+"delay": 10,
 "avg_awb":200,
 "avg_speed":6,
 "avg_speed_nb_img":3,
@@ -52,10 +52,8 @@ class Trajectory(object):
     def __init__(self, config=None, json_file=None):
         self.start_time = time.time()
         self.config = config or []
-        self.pwm = Adafruit_PCA9685.PCA9685()
-        self.pwm.set_pwm_freq(60)
-        self.servo_id_tilt = 15
-        self.servo_id_pan = 14
+        self.servo_tilt = servo.tilt
+        self.servo_pan = servo.pan
         self.default_pos = Position(0, 90)
 
         if json_file:
@@ -80,13 +78,18 @@ class Trajectory(object):
     def goto(self, when):
         """move the camera to the position it need to be at a given timestamp"""
         pos = self.calc_pos(when)
-        self.goto_pos(pos)
+        threading.Thread(target=self.goto_pos,args=(pos,)).start()
+        #self.goto_pos(pos)
         return pos
 
     def goto_pos(self, pos):
         pan, tilt = pos
-        self.pwm.set_pwm(self.servo_id_pan, 0, self.angle(pan))
-        self.pwm.set_pwm(self.servo_id_tilt, 0, self.angle(tilt))
+        self.servo_tilt.move(tilt)
+        self.servo_pan.move(pan)
+        time.sleep(1)
+        self.servo_tilt.off()
+        self.servo_pan.off()
+
  
     def calc_pos(self, when):
         """Calculate the position it need to be at a given timestamp"""
@@ -117,18 +120,9 @@ class Trajectory(object):
         #print(last_timestamp, remaining, delta, adv)
         return Position(pan,tilt)
 
-    @staticmethod
-    def angle(val):
-        '''calculate the pwm for requested angle
-        angle goes from -90 to +90 deg'''
-        # Configure min and max servo pulse lengths
-        servo_min = 150  # Min pulse length out of 4096
-        servo_max = 600  # Max pulse length out of 4096
-        return int(round(servo_min + (90.0 - val) * (servo_max - servo_min) / 180.0))
-
 
 class TimeLaps(object):
-    def __init__(self, resolution=(2592, 1944), fps=1, delay=360, 
+    def __init__(self, resolution=(2592, 1952), fps=1, delay=360, 
                  folder=".", avg_awb=200, avg_speed=25, config_file="parameters.json"):
         self.resolution = resolution
         self.fps = fps
@@ -194,7 +188,7 @@ class TimeLaps(object):
 
     def save(self, ary, name, exp_speed=125, iso=100):
         "save an array"
-        Image.fromarray(ary).save(name)
+        Image.fromarray(ary).save(name, quality=80)
         exif = pyexiv2.ImageMetadata(name)
         exif.read()
         exif["Exif.Photo.ExposureTime"] = Fraction(1, int(round(exp_speed)))
@@ -229,7 +223,8 @@ class TimeLaps(object):
         fname = datetime.datetime.fromtimestamp(self.last_img).strftime("%Y-%m-%d-%Hh%Mm%Ss.jpg")
         print("%s s/%.3f iso %i, expected speed=%.3f R=%.3f B=%.3f"%(fname, ns, iso, self.next_speed, self.next_wb[0], self.next_wb[1]))
         self.camera.capture(self.raw, "rgb")
-        self.save(self.raw.array, fname, ns, iso)
+        threading.Thread(target=self.save,args=(self.raw.array.copy(), fname, ns, iso)).start()
+        #self.save(self.raw.array, fname, ns, iso)
         self.raw.truncate(0)
         self.camera.awb_mode = "auto"
         self.camera.iso = 0
@@ -246,6 +241,11 @@ class TimeLaps(object):
             return
         r = 1.0 * r
         b = 1.0 * b
+        if r == 0.0: 
+            r = 1.0
+        if b == 0.0:
+            b = 1.0
+
         self.last_wb = (r, b)
         ls = self.last_speed / self.last_gain
         self.red_gains.append(r)
@@ -282,6 +282,7 @@ if __name__ == "__main__":
     tl.measure()
     while True:
         tl.capture()
+        #print(time.time(), tl.next_img)
         while time.time() < tl.next_img:
             time.sleep(1.0*tl.avg_speed_nb_img*tl.delay/tl.avg_speed)
             tl.measure()
