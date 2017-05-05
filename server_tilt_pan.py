@@ -126,8 +126,11 @@ Pan: {pan} Tilt: {tilt}
         return webpage
 
     def goto_pos(self, pos):
-        self.servo_pan.move(pos[0])
-        self.servo_tilt.move(pos[1])
+        try:
+            self.servo_pan.move(pos[0])
+            self.servo_tilt.move(pos[1])
+        except IOError as err:
+            print(err)
         time.sleep(1)
 
     def pan_min(self):

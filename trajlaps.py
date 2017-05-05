@@ -14,7 +14,7 @@ import math
 from fractions import Fraction
 import json
 import pyexiv2
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from argparse import ArgumentParser
 import servo
 
@@ -23,27 +23,27 @@ Position = namedtuple("Position", ("pan", "tilt"))
 
 
 trajectory={
-"delay": 10,
+"delay": 20,
 "avg_awb":200,
 "avg_speed":6,
 "avg_speed_nb_img":3,
 "trajectory": [
- {"tilt":45,
-  "pan":90,
+ {"tilt":30,
+  "pan":-50,
   "stay": 10,
   "move": 10},
- {"tilt":35,
+ {"tilt":30,
   "pan":70,
   "stay": 10,
-  "move": 10},
- {"tilt":00,
-  "pan":+20,
+  "move": 21000},
+ {"tilt":30,
+  "pan":-50,
   "stay": 10,
-  "move": 10},
- {"tilt":00,
-  "pan":-40,
-  "stay": 10,
-  "move": 10},
+  "move": 1000},
+# {"tilt":00,
+#  "pan":-40,
+#  "stay": 10,
+#  "move": 10},
  ]
 }
 
@@ -173,16 +173,15 @@ class TimeLaps(object):
             self.avg_awb = dico.get("avg_awb", self.avg_awb)
             
     def save_config(self):
-        dico = {"red_gains": self.red_gains, 
-                "blue_gains": self.blue_gains,
-                "speeds": self.speeds,
-                "trajectory": self.trajectory.config,
-                "avg_awb": self.avg_awb,
-                "avg_speed": self.avg_speed,
-                "self.avg_speed_nb_img": self.avg_speed_nb_img,
-                "delay": self.delay
-                }
-
+        dico = OrderedDict([                           
+                            ("speeds", self.speeds),
+                            ("trajectory", self.trajectory.config),
+                            ("avg_awb", self.avg_awb),
+                            ("avg_speed", self.avg_speed),
+                            ("self.avg_speed_nb_img", self.avg_speed_nb_img),
+                            ("delay", self.delay),
+                            ("red_gains", self.red_gains),  
+                            ("blue_gains", self.blue_gains)])
         with open(self.config_file,"w") as jsonfile:
             jsonfile.write(json.dumps(dico, indent=2))
 
@@ -200,7 +199,7 @@ class TimeLaps(object):
     def capture(self):
         """Take a picture with the camera, if there is enough light
         """
-        if not self.is_valid():
+        if not self.is_valid:
             print("Skipped, low light Speed %.3f/iso%.0f"%(self.last_speed, self.last_gain))
             self.last_img = time.time()
             self.next_img = self.last_img + self.delay
@@ -235,9 +234,10 @@ class TimeLaps(object):
         self.camera.capture(self.raw, 'rgb')
         self.raw.truncate(0)
         r,b = self.camera.awb_gains
+        print("Measured exposure_speed: %f analog_gain: %f digital_gain: %f"%(self.camera.exposure_speed, self.camera.analog_gain, self.camera.digital_gain))
         self.last_speed = 1.0e6 / self.camera.exposure_speed
         self.last_gain = 1.0 * self.camera.analog_gain * self.camera.digital_gain
-        if not self.is_valid():
+        if not self.is_valid:
             return
         r = 1.0 * r
         b = 1.0 * b
@@ -268,6 +268,7 @@ class TimeLaps(object):
         self.next_wb = rg,bg
         self.save_config()
 
+    @property
     def is_valid(self):
        return self.last_speed/self.last_gain >=0.4 
     
@@ -276,7 +277,7 @@ if __name__ == "__main__":
                             description="TimeLaps over a trajectory")
     parser.add_argument("-j", "--json", help="config file")
     args = parser.parse_args()
-    tl = TimeLaps(config_file=args.json)
+    tl = TimeLaps(resolution=(3296,2464), config_file=args.json)
     print("Warmup ...")
     time.sleep(2)
     tl.measure()
