@@ -5,7 +5,7 @@ import Adafruit_PCA9685
 pwm = Adafruit_PCA9685.PCA9685()
 # Set frequency to 50hz, good for servos.
 # gives a period of 20ms/cycle
-FREQ = 50
+FREQ = 300
 RESOLUTION = 4096
 pwm.set_pwm_freq(FREQ)
 
@@ -51,6 +51,12 @@ class SG90(Servo):
         self.slope = (tickmax - tickmin) / (amax - amin)
         self.inter = tickmin - amin * self.slope 
 
-pan = SG90(14, reverse=True, offset=-90)
-tilt = SG90(15, reverse=True, offset=-90)
+
+class M15S(SG90):
+    SPEC = { -90: 482,
+            180: 2604,}
+
+
+pan = M15S(15, reverse=True, offset=-90)
+tilt = SG90(6, reverse=False, offset=-90)
 
