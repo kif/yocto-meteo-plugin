@@ -307,7 +307,7 @@ class MMA8451(object):
 
 
 if __name__ == "__main__":
-    mma8451 = MMA8451()
+    mma8451 = MMA8451(sensor_range=RANGE_2G,data_rate=BW_RATE_6_25HZ, debug=True)
     while True:
         axes = mma8451.get_axes_measurement()
         print "Position = %d" % (mma8451.get_orientation())
