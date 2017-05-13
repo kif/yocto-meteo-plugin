@@ -4,6 +4,7 @@
 from __future__ import division, print_function
 import logging
 import io
+from math import atan2, pi
 from threading import Condition
 from picamera import PiCamera
 from PIL import Image
@@ -17,8 +18,14 @@ import json
 import servo
 import time
 from exposure import Exposure
+from accelero import Accelerometer
+
 cam_lens = Exposure()
 print(cam_lens)
+acc = Accelerometer()
+acc.start()
+acc.still_event.set()
+
 
 Position = namedtuple("Position", ("pan", "tilt"))
 
@@ -36,7 +43,7 @@ class Server(object):
 <body>
 <center>
 <p>
-Pan: {pan} Tilt: {tilt} ISO: {iso} EV: {EV}
+Pan: {pan} Tilt: {tilt} EV: {EV}
 </p><p> 
 <a href="save" title="add position to trajectory">Save pos</a>
 </p><p>
@@ -75,6 +82,9 @@ Pan: {pan} Tilt: {tilt} ISO: {iso} EV: {EV}
 <li>framerate: {framerate}</li>
 <li>shutter_speed: {shutter_speed}</li>
 <li>date_time: {date_time}</li>
+<li>Gravity: {gravity}</li>
+<li>Measured tilt: {meas_tilt}°</li>
+<li>Measured roll: {meas_roll}°</li>
 </ul>
 </body>
 </html>
@@ -92,7 +102,7 @@ Pan: {pan} Tilt: {tilt} ISO: {iso} EV: {EV}
         self.servo_tilt = servo.tilt
         self.servo_pan = servo.pan
         self.default_pos = Position(0, 0)
-        self.current_pos = self.default_pos
+        self.current_pos = None
         self.cam = None
         self.streamout = None
         self.resolution = (640, 480)
@@ -146,7 +156,11 @@ Pan: {pan} Tilt: {tilt} ISO: {iso} EV: {EV}
         self.bottle.run(host=self.ip, port=self.port)
 
     def move(self, new_pos=None):
-        new_pos = new_pos or self.current_pos
+        if new_pos is None:
+            if self.current_pos is None:
+                new_pos = self.default_pos
+            else:
+                new_pos = self.current_pos
         if new_pos.tilt<-90:
             new_pos = Position(new_pos.pan, -90)
         elif new_pos.tilt>90:
@@ -155,7 +169,8 @@ Pan: {pan} Tilt: {tilt} ISO: {iso} EV: {EV}
             new_pos = Position(-90, new_pos.tilt)
         elif new_pos.pan>180:
             new_pos = Position(180, new_pos.tilt)
-        self.goto_pos(new_pos)
+        if new_pos != self.current_pos:
+            self.goto_pos(new_pos)
         
         dico = self.capture()
         dico["tilt"]= new_pos.tilt
@@ -171,17 +186,23 @@ Pan: {pan} Tilt: {tilt} ISO: {iso} EV: {EV}
             self.wb_blue = wb_blue[-self.avg_wb:]
         if len(self.histo_ev) > self.avg_ev:
             self.histo_ev = self.histo_ev[-self.avg_ev:]
+        grav = acc.get()
+        dico["gravity"] = grav
+        dico["meas_tilt"] = 180*atan2(-grav.y,-grav.z) if grav else "?"
+        dico["meas_roll"] = 180*atan2(grav.x,-grav.z)  if grav else "?"
         webpage = self.page.format(**dico)
         self.current_pos = new_pos
         return webpage
 
     def goto_pos(self, pos):
+        acc.still_event.clear()
         try:
             self.servo_pan.move(pos[0])
             self.servo_tilt.move(pos[1])
         except IOError as err:
             print(err)
-        time.sleep(1)
+        time.sleep(0.1)
+        acc.still_event.set()
 
     def pan_min(self):
         pos = Position(-90, self.current_pos.tilt)

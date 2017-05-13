@@ -1,10 +1,12 @@
 #!/usr/bin/python
 
+import logging
 import time
 from mma8451 import MMA8451, RANGE_2G, BW_RATE_6_25HZ
 from threading import Thread, Event, Semaphore
 from collections import namedtuple
 
+logger = logging.getLogger("accelero")
 Gravity = namedtuple("Gravity",["x", "y", "z"])
 
 
@@ -42,12 +44,14 @@ class Accelerometer(Thread):
         if not self.history:
             return self.stored
         with self.sem:
-            x,y,z = 0
+            x = 0.0
+            y = 0.0
+            z = 0.0
             for i, g in enumerate(self.history):
                 x += g.x
                 y += g.y
                 z += g.z
-            print("average over", i)
+            logger.debug("average over %s measurements", i)
             self.stored = Gravity(x/(i+1.0), y/(i+1.0), z/(i+1.0))
         return self.stored
 
