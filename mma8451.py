@@ -1,4 +1,4 @@
-#
+#!/usr/bin/python
 # mma8451.py - Python API for MMA8451 accelerometer.
 #
 # See 'LICENSE'  for copying
@@ -307,11 +307,9 @@ class MMA8451(object):
 
 
 if __name__ == "__main__":
-    mma8451 = MMA8451(sensor_range=RANGE_2G,data_rate=BW_RATE_6_25HZ, debug=True)
+    mma8451 = MMA8451(sensor_range=RANGE_2G,data_rate=BW_RATE_6_25HZ, debug=False)
     while True:
         axes = mma8451.get_axes_measurement()
-        print "Position = %d" % (mma8451.get_orientation())
-        print "   x = %.3fm/s2" % (axes['x'])
-        print "   y = %.3fm/s2" % (axes['y'])
-        print "   z = %.3fm/s2" % (axes['z'])
+        print("Position = %d   x = %.3fm/s2    y = %.3fm/s2    z = %.3fm/s2" % 
+             (mma8451.get_orientation(),axes['x'], axes['y'], axes['z']))
         time.sleep(0.1)
