@@ -15,6 +15,9 @@ class Exposure(object):
         self.focal = focal
         self.aperture = aperture
 
+    def __repr__(self):
+        return "Exposure calculation for lens with f'=%smm and aperture F/%s"%(self.focal, self.aperture)
+
     def calc_EV(self, speed, gain=None, iso=100):
         """absolute exposure calculator
 

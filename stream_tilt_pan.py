@@ -16,6 +16,9 @@ from collections import namedtuple, OrderedDict
 import json
 import servo
 import time
+from exposure import Exposure
+cam_lens = Exposure()
+print(cam_lens)
 
 Position = namedtuple("Position", ("pan", "tilt"))
 
@@ -27,15 +30,14 @@ class Server(object):
     page = """
 <html>
 <header>
-<META HTTP-EQUIV="refresh" CONTENT="1">
+<META HTTP-EQUIV="refresh" CONTENT="1; url=/">
 <title> pan= {pan} tilt= {tilt}</title>
 </header>
 <body>
 <center>
 <p>
-Pan: {pan} Tilt: {tilt}
+Pan: {pan} Tilt: {tilt} ISO: {iso} EV: {EV}
 </p><p> 
-<a href="reload" title="re-take image">Capture</a>
 <a href="save" title="add position to trajectory">Save pos</a>
 </p><p>
 <a href="pan_min" title="pan -90"> |&lt </a>
@@ -44,9 +46,9 @@ Pan: {pan} Tilt: {tilt}
 <a href="pan_0" title="pan =0"> pan center </a>
 <a href="pan_+1" title="pan +=01"> &gt </a>
 <a href="pan_+10" title="pan +=10"> &gt&gt </a>
-<a href="pan_max" title="pan +90"> &gt| </a>
+<a href="pan_max" title="pan +180"> &gt| </a>
 </p><p>
-<a href="tilt_min" title="tilt = -50"> |&lt </a>
+<a href="tilt_min" title="tilt = -90"> |&lt </a>
 <a href="tilt_-10" title="tilt -= 10"> &lt&lt </a>
 <a href="tilt_-1" title="tilt -= 01"> &lt </a>
 <a href="tilt_0" title="tilt = 0"> Tilt center </a>
@@ -56,6 +58,24 @@ Pan: {pan} Tilt: {tilt}
 </p>
 <p><img src="stream.jpg" width="640" height="480" title="{date_time}"/></p>
 </center>
+<p> All metadata </p>
+<ul>
+<li>Camera: {revision}</li>
+<li>Tilt: {tilt}°</li>
+<li>Pan: {pan}°</li>
+<li>Focal: 2.8mm</li>
+<li>Aperture: F/2.8</li>
+<li>speed: {speed} 1/s</li>
+<li>ISO: {iso} </li>
+<li>awb_gains: {awb_gains}</li>
+<li>analog_gain: {analog_gain}</li>
+<li>digital_gain: {digital_gain}</li>
+<li>exposure_compensation: {exposure_compensation}</li>
+<li>exposure_speed: {exposure_speed}</li>
+<li>framerate: {framerate}</li>
+<li>shutter_speed: {shutter_speed}</li>
+<li>date_time: {date_time}</li>
+</ul>
 </body>
 </html>
     """
@@ -76,6 +96,11 @@ Pan: {pan} Tilt: {tilt}
         self.cam = None
         self.streamout = None
         self.resolution = (640, 480)
+        self.avg_wb = 200
+        self.avg_ev = 200
+        self.histo_ev = []
+        self.wb_red = []
+        self.wb_blue = []
         self.last_image = None
         self.setup_cam()
 
@@ -122,21 +147,30 @@ Pan: {pan} Tilt: {tilt}
 
     def move(self, new_pos=None):
         new_pos = new_pos or self.current_pos
-        if new_pos.tilt<-50:
-            new_pos = Position(new_pos.pan, -50)
+        if new_pos.tilt<-90:
+            new_pos = Position(new_pos.pan, -90)
         elif new_pos.tilt>90:
             new_pos = Position(new_pos.pan, 90)
         if new_pos.pan <-90:
             new_pos = Position(-90, new_pos.tilt)
-        elif new_pos.pan>90:
-            new_pos = Position( 90, new_pos.tilt)
+        elif new_pos.pan>180:
+            new_pos = Position(180, new_pos.tilt)
         self.goto_pos(new_pos)
-        #TODO: take picture and update web page and return it
-        dico={"tilt": new_pos.tilt,
-              "pan": new_pos.pan,
-              }
-        dico["date_time"] = self.capture()
-        dico["image"] = self.last_image
+        
+        dico = self.capture()
+        dico["tilt"]= new_pos.tilt
+        dico["pan"] =  new_pos.pan
+        if dico["EV"] != "?":
+            self.histo_ev.append(dico["EV"])
+        if dico["awb_gains"] != [0,0]:
+            red, blue = dico["awb_gains"]
+            self.wb_red.append(red)
+            self.wb_blue.append(blue)
+        if len(self.wb_red) > self.avg_wb:
+            self.wb_red = self.wb_red[-self.avg_wb:]
+            self.wb_blue = wb_blue[-self.avg_wb:]
+        if len(self.histo_ev) > self.avg_ev:
+            self.histo_ev = self.histo_ev[-self.avg_ev:]
         webpage = self.page.format(**dico)
         self.current_pos = new_pos
         return webpage
@@ -154,11 +188,11 @@ Pan: {pan} Tilt: {tilt}
         return self.move(pos)
 
     def pan_max(self):
-        pos = Position(+90, self.current_pos.tilt)
+        pos = Position(+180, self.current_pos.tilt)
         return self.move(pos)
     
     def tilt_min(self):
-        pos = Position(self.current_pos.pan, -50)
+        pos = Position(self.current_pos.pan, -90)
         return self.move(pos)
 
     def tilt_max(self):
@@ -212,10 +246,29 @@ Pan: {pan} Tilt: {tilt}
  
     def capture(self):
         now = datetime.datetime.now().strftime("%Y-%m-%d-%Hh%Mm%Ss")
-        fname = "%s/%s.jpg"%(self.img_dir,now)
-        self.cam.capture(fname)
-        self.last_image = fname
-        return now
+        dico = {"iso": float(self.cam.iso),
+                "analog_gain": float(self.cam.analog_gain),
+                "awb_gains": [float(i) for i in self.cam.awb_gains],
+                "digital_gain": float(self.cam.digital_gain),
+                "exposure_compensation": float(self.cam.exposure_compensation),
+                "exposure_speed": float(self.cam.exposure_speed),
+                "framerate": float(self.cam.framerate),
+                "revision": self.cam.revision,
+                "shutter_speed": float(self.cam.shutter_speed),
+                "date_time": now}
+        gain = dico["digital_gain"]
+        if gain == 0:
+            gain == 1
+        gain *= dico["analog_gain"]
+        if dico["exposure_speed"] ==0:
+            dico["speed"] = "?"
+        else:
+            dico["speed"] = 1e6/dico["exposure_speed"]
+        if gain == 0 or dico["exposure_speed"] ==0:
+            dico["EV"] = "?"
+        else:
+            dico["EV"] = cam_lens.calc_EV(dico["speed"], gain=gain)
+        return dico
 
     def save(self):
         self.trajectory.append(self.current_pos)
@@ -223,9 +276,11 @@ Pan: {pan} Tilt: {tilt}
                 for i in self.trajectory]
         dico = OrderedDict((("trajectory", traj),
                             ("delay", 10),
-                            ("avg_awb", 200),
-                            ("avg_speed", 6),
-                            ("avg_speed_nb_img",3)))
+                            ("avg_wb", self.avg_wb),
+                            ("avg_ev", self.avg_ev),
+                            ("histo_wb", self.histo_wb),
+                            ("histo_ev", self.histo_ev),
+                            ))
 
         with open(self.traj_file,"w") as f:
             f.write(json.dumps(dico, indent=4))
@@ -238,13 +293,10 @@ Pan: {pan} Tilt: {tilt}
                 with self.streamout.condition:
                     self.streamout.condition.wait()
                     frame = self.streamout.frame
-                    print("yield")
                     return frame 
-                    #yield bottle.FileUpload(frame, "stream.mjpg", "stream.mjpg", headers=headers)
         except Exception as e:
             logging.warning('Removed streaming client: %s', e)
                             
-
 
 class StreamingOutput(object):
     """This class handles the stream"""
@@ -271,7 +323,7 @@ def main():
     parser.add_argument("-i", "--ip", help="Listen on this port", type=str, default="0.0.0.0")
     parser.add_argument("-d", "--directory", help="Directory containing images", type=str, default="images")
     args = parser.parse_args()
-    server = Server( img_dir=args.directory, ip=args.ip, port=args.port)
+    server = Server(img_dir=args.directory, ip=args.ip, port=args.port)
     server.start()
 
 if __name__== '__main__' :

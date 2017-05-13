@@ -306,10 +306,18 @@ class MMA8451(object):
         return {"x": x, "y": y, "z": z}
 
 
+class Accelerometer(object):
+    def __init__(self):
+        pass
+
+
 if __name__ == "__main__":
     mma8451 = MMA8451(sensor_range=RANGE_2G,data_rate=BW_RATE_6_25HZ, debug=False)
+    mma8451.set_resolution()
     while True:
         axes = mma8451.get_axes_measurement()
-        print("Position = %d   x = %.3fm/s2    y = %.3fm/s2    z = %.3fm/s2" % 
-             (mma8451.get_orientation(),axes['x'], axes['y'], axes['z']))
+        print("g x = %.3fm/s2    y = %.3fm/s2    z = %.3fm/s2" % 
+             (axes['x'], axes['y'], axes['z']))
+        #print("Position = %d   x = %.3fm/s2    y = %.3fm/s2    z = %.3fm/s2" % 
+        #     (mma8451.get_orientation(),axes['x'], axes['y'], axes['z']))
         time.sleep(0.1)

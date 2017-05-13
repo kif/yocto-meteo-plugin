@@ -57,6 +57,6 @@ class M15S(SG90):
             180: 2604,}
 
 
-pan = M15S(15, reverse=True, offset=-90)
-tilt = SG90(6, reverse=False, offset=-90)
+pan = M15S(14, reverse=True, offset=-90)
+tilt = SG90(15, reverse=False, offset=-90)
 
