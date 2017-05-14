@@ -4,7 +4,7 @@
 from __future__ import division, print_function
 import logging
 import io
-from math import atan2, pi
+from math import atan2, pi, acos, sqrt
 from threading import Condition, Timer
 from picamera import PiCamera
 from PIL import Image
@@ -19,6 +19,8 @@ import servo
 import time
 from exposure import Exposure
 from accelero import Accelerometer
+
+sign = lambda x: -1 if x < 0 else 1
 
 cam_lens = Exposure()
 print(cam_lens)
@@ -37,15 +39,11 @@ class Server(object):
 <html>
 <header>
 <META HTTP-EQUIV="refresh" CONTENT="1; url=/">
-<title> pan= {pan} tilt= {tilt}</title>
+<title> pan={pan} tilt={tilt} EV= {EV}</title>
 </header>
 <body>
 <center>
 <p>
-Pan: {pan} Tilt: {tilt} EV: {EV}
-</p><p> 
-<a href="save" title="add position to trajectory">Save pos</a>
-</p><p>
 <a href="pan_min" title="pan -90"> |&lt </a>
 <a href="pan_-10" title="pan -=10"> &lt&lt </a>
 <a href="pan_-01" title="pan -=01"> &lt </a>
@@ -63,12 +61,14 @@ Pan: {pan} Tilt: {tilt} EV: {EV}
 <a href="tilt_max" title="tilt +90"> &gt| </a>
 </p>
 <p><img src="stream.jpg" width="640" height="480" title="{date_time}"/></p>
+<p><a href="save" title="add position to trajectory">Save pos</a></p>
 </center>
 <p> All metadata </p>
 <ul>
 <li>Camera: {revision}</li>
 <li>Tilt: {tilt}°</li>
 <li>Pan: {pan}°</li>
+<li>EV: {EV}</li>
 <li>Focal: 2.8mm</li>
 <li>Aperture: F/2.8</li>
 <li>speed: {speed} 1/s</li>
@@ -182,13 +182,20 @@ Pan: {pan} Tilt: {tilt} EV: {EV}
             self.wb_blue.append(blue)
         if len(self.wb_red) > self.avg_wb:
             self.wb_red = self.wb_red[-self.avg_wb:]
-            self.wb_blue = wb_blue[-self.avg_wb:]
+            self.wb_blue = self.wb_blue[-self.avg_wb:]
         if len(self.histo_ev) > self.avg_ev:
             self.histo_ev = self.histo_ev[-self.avg_ev:]
         grav = acc.get()
         dico["gravity"] = grav
-        dico["meas_tilt"] = 180*atan2(-grav.y,-grav.z) if grav else "?"
-        dico["meas_roll"] = 180*atan2(grav.x,-grav.z)  if grav else "?"
+        if grav:
+            #g = sqrt(grav.x*grav.x+grav.y*grav.y+grav.z*grav.z)
+            #m_tilt = 180.0 * acos(-grav.z/g) / pi * sign(-grav.y)
+            m_tilt = 180.0 * atan2(-grav.y, -grav.z) / pi
+            m_roll = 180.0 * atan2(-grav.x, -grav.z) / pi
+        else:
+            m_roll = m_tilt = "?"
+        dico["meas_tilt"] = m_tilt
+        dico["meas_roll"] = m_roll
         webpage = self.page.format(**dico)
         self.current_pos = new_pos
         return webpage
@@ -201,6 +208,7 @@ Pan: {pan} Tilt: {tilt} EV: {EV}
         except IOError as err:
             print(err)
         t = Timer(1.0, self.stop_motors)
+        t.start()
         #stop motors after a second
 
     def stop_motors(self):

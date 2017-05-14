@@ -79,19 +79,21 @@ class Accelerometer(Thread):
         "collect a value and adds it to the history"
         axes = self.mma8451.get_axes_measurement()
         g2 = axes["x"]**2+axes['y']**2+axes['z']**2
-        print(g2)
+        #print(g2)
         if g2>90 and g2<100: #keep only if acc ~= g 
             with self.sem:
                 self.history.append(Gravity(axes["x"], axes['y'], axes['z']))
 
 
 if __name__ == "__main__":
+    from math import atan2, pi
     acc = Accelerometer()
     acc.start()
     i = 0
     while True:
         i+=1
-        print(acc.get())
+        grav = acc.get()
+        print(grav, 180.0 * atan2(-grav.y, -grav.z) / pi, 180.0 * atan2(-grav.x, -grav.z) / pi)
         if i%10==0:
             print("pause")
             acc.pause()
