@@ -24,7 +24,6 @@ cam_lens = Exposure()
 print(cam_lens)
 acc = Accelerometer()
 acc.start()
-acc.still_event.set()
 
 
 Position = namedtuple("Position", ("pan", "tilt"))
@@ -195,14 +194,20 @@ Pan: {pan} Tilt: {tilt} EV: {EV}
         return webpage
 
     def goto_pos(self, pos):
-        acc.still_event.clear()
+        acc.pause()
         try:
             self.servo_pan.move(pos[0])
             self.servo_tilt.move(pos[1])
         except IOError as err:
             print(err)
-        time.sleep(0.1)
-        acc.still_event.set()
+
+    def stop_motors(self):
+        try:
+            self.servo_pan.off()
+            self.servo_tilt.off()
+        except IOError as err:
+            print(err)
+        acc.resume()
 
     def pan_min(self):
         pos = Position(-90, self.current_pos.tilt)
