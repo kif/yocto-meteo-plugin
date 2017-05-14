@@ -5,7 +5,7 @@ from __future__ import division, print_function
 import logging
 import io
 from math import atan2, pi
-from threading import Condition
+from threading import Condition, Timer
 from picamera import PiCamera
 from PIL import Image
 import os
@@ -200,6 +200,8 @@ Pan: {pan} Tilt: {tilt} EV: {EV}
             self.servo_tilt.move(pos[1])
         except IOError as err:
             print(err)
+        t = Timer(1.0, self.stop_motors)
+        #stop motors after a second
 
     def stop_motors(self):
         try:
@@ -304,8 +306,9 @@ Pan: {pan} Tilt: {tilt} EV: {EV}
                             ("delay", 10),
                             ("avg_wb", self.avg_wb),
                             ("avg_ev", self.avg_ev),
-                            ("histo_wb", self.histo_wb),
                             ("histo_ev", self.histo_ev),
+                            ("wb_red", self.wb_red),
+                            ("wb_blue", self.wb_blue),
                             ))
 
         with open(self.traj_file,"w") as f:

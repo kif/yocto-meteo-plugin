@@ -17,15 +17,20 @@ import pyexiv2
 from collections import namedtuple, OrderedDict
 from argparse import ArgumentParser
 import servo
+from accelero import Accelerometer
+from exposition import Exposition
 
+lens = Exposition()
+acc = ()
+acc.start
 
 Position = namedtuple("Position", ("pan", "tilt"))
 
 
 trajectory={
 "delay": 20,
-"avg_awb":200,
-"avg_speed":6,
+"avg_wb":200,
+"avg_ev":6,
 "avg_speed_nb_img":3,
 "trajectory": [
  {"tilt":30,
@@ -40,12 +45,27 @@ trajectory={
   "pan":-50,
   "stay": 10,
   "move": 1000},
-# {"tilt":00,
-#  "pan":-40,
-#  "stay": 10,
-#  "move": 10},
  ]
 }
+
+class SavGol(object):
+    "Class for Savitsky-Golay filtering"
+    def __init__(self, order=2):
+        "select the order of the filter"
+        self.order = order
+        self.cache = {} #len, filter
+
+    def filter(lst):
+        "filter a list. the last having the more weight"
+        l = len(lst)
+        if l%2 == 0:
+            lst = numpy.array(lst[1:])
+            l -= 1
+        else:
+            lst = numpy.array(lst)
+        if l not in self.cache:
+            self.cache[l] = scipy.signal.savgol_coeffs(l, self.order, pos=0)
+        return numpy.dot(lst, self.cache[l])
 
 SG = [-0.2, 0, 0.2, 0.4, 0.6 ]
 class Trajectory(object):
@@ -54,7 +74,7 @@ class Trajectory(object):
         self.config = config or []
         self.servo_tilt = servo.tilt
         self.servo_pan = servo.pan
-        self.default_pos = Position(0, 90)
+        self.default_pos = Position(0, 0)
 
         if json_file:
             self.load_config(json_file)
@@ -79,17 +99,17 @@ class Trajectory(object):
         """move the camera to the position it need to be at a given timestamp"""
         pos = self.calc_pos(when)
         threading.Thread(target=self.goto_pos,args=(pos,)).start()
-        #self.goto_pos(pos)
         return pos
 
     def goto_pos(self, pos):
         pan, tilt = pos
+        acc.pause()
         self.servo_tilt.move(tilt)
         self.servo_pan.move(pan)
         time.sleep(1)
         self.servo_tilt.off()
         self.servo_pan.off()
-
+        acc.resume()
  
     def calc_pos(self, when):
         """Calculate the position it need to be at a given timestamp"""
@@ -123,13 +143,13 @@ class Trajectory(object):
 
 class TimeLaps(object):
     def __init__(self, resolution=(2592, 1952), fps=1, delay=360, 
-                 folder=".", avg_awb=200, avg_speed=25, config_file="parameters.json"):
+                 folder=".", avg_awb=200, avg_ev=25, config_file="parameters.json"):
         self.resolution = resolution
         self.fps = fps
         self.delay = delay
         self.folder = os.path.abspath(folder)
-        self.avg_awb = avg_awb # time laps over which average gains
-        self.avg_speed = avg_speed # time laps over which average speed
+        self.avg_wb = avg_awb # time laps over which average gains
+        self.avg_ev = avg_ev # time laps over which average speed
         self.avg_speed_nb_img = 3.0
         self.config_file = os.path.abspath(config_file)
         self.red_gains = []
@@ -164,20 +184,20 @@ class TimeLaps(object):
         if os.path.isfile(self.config_file):
             with open(self.config_file) as jsonfile:
                 dico = json.load(jsonfile)
-            self.red_gains = dico.get("red_gains", self.red_gains)
-            self.blue_gains = dico.get("blue_gains", self.blue_gains)
+            self.red_gains = dico.get("wb_red", self.red_gains)
+            self.blue_gains = dico.get("wb_blue", self.blue_gains)
             self.speeds = dico.get("speeds", self.speeds)
             self.delay = dico.get("delay", self.delay)
             self.avg_speed_nb_img = dico.get("avg_speed_nb_img", self.avg_speed_nb_img)
-            self.avg_speed = dico.get("avg_speed", self.avg_speed)
-            self.avg_awb = dico.get("avg_awb", self.avg_awb)
+            self.avg_ev = dico.get("avg_ev", self.avg_ev)
+            self.avg_wb = dico.get("avg_wb", self.avg_wb)
             
     def save_config(self):
         dico = OrderedDict([                           
                             ("speeds", self.speeds),
                             ("trajectory", self.trajectory.config),
-                            ("avg_awb", self.avg_awb),
-                            ("avg_speed", self.avg_speed),
+                            ("avg_wb", self.avg_wb),
+                            ("avg_ev", self.avg_ev),
                             ("self.avg_speed_nb_img", self.avg_speed_nb_img),
                             ("delay", self.delay),
                             ("red_gains", self.red_gains),  
@@ -251,11 +271,11 @@ class TimeLaps(object):
         self.red_gains.append(r)
         self.blue_gains.append(b)
         self.speeds.append(math.log(ls, 2.0))
-        if len(self.red_gains) > self.avg_awb:
-            self.red_gains = self.red_gains[-self.avg_awb:]
-            self.blue_gains = self.blue_gains[-self.avg_awb:]
-        if len(self.speeds) > self.avg_speed:
-           self.speeds = self.speeds[-self.avg_speed:]
+        if len(self.red_gains) > self.avg_wb:
+            self.red_gains = self.red_gains[-self.avg_wb:]
+            self.blue_gains = self.blue_gains[-self.avg_wb:]
+        if len(self.speeds) > self.avg_ev:
+           self.speeds = self.speeds[-self.avg_ev:]
         if len(self.speeds) < len(SG):
             self.speeds += [self.speeds[-1]] * (len(SG) - len(self.speeds))
         rg = sum(self.red_gains)/len(self.red_gains)
@@ -285,6 +305,6 @@ if __name__ == "__main__":
         tl.capture()
         #print(time.time(), tl.next_img)
         while time.time() < tl.next_img:
-            time.sleep(1.0*tl.avg_speed_nb_img*tl.delay/tl.avg_speed)
+            time.sleep(1.0*tl.avg_speed_nb_img*tl.delay/tl.avg_ev)
             tl.measure()
     pass
