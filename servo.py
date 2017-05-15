@@ -23,8 +23,9 @@ class Servo(object):
         self.inter = 0
 
     def move(self, angle):
-        angle = self.calc(angle)
-        pwm.set_pwm(self.pin, 0, int(round(angle)))
+        ticks = self.calc(angle)
+        #print("ticks: %s"%ticks)
+        pwm.set_pwm(self.pin, 0, int(round(ticks)))
 
     def off(self):
         pwm.set_pwm(self.pin, 0, 0)
@@ -57,6 +58,38 @@ class M15S(SG90):
             180: 2604,}
 
 
+class MG90s(SG90):
+    SPEC={  4: 581,#us
+          176: 2380}
+
+
+class TSS11MGB(Servo):
+    SPEC={  2.17: 691.732,#deg->us
+            175.23: 2685.55}
+    def __init__(self, pin, offset=0, reverse=False):
+        Servo.__init__(self, pin, offset=offset, reverse=reverse)
+        angles = list(self.SPEC.keys())
+        amax = max(angles)
+        amin = min(angles)
+        tick = 1.0e6 / FREQ / RESOLUTION
+        tickmax = self.SPEC[amax] / tick
+        tickmin = self.SPEC[amin] / tick
+        self.slope = (tickmax - tickmin) / (amax - amin)
+        self.inter = tickmin - amin * self.slope
+
+    def calc(self, angle):
+        if self.reverse:
+            angle=-angle
+        if self.offset:
+            angle -= self.offset
+        #Protect for out of bounds ...
+        angles = list(self.SPEC.keys())
+        angle = max(angle, min(angles))
+        angle = min(angle, max(angles))
+        #print(angle)
+        return int(round(self.inter + self.slope*angle))
+
 pan = M15S(14, reverse=True, offset=-90)
 tilt = SG90(15, reverse=False, offset=-90)
-
+mg90 = MG90s(13, reverse=False, offset=0)
+tss = TSS11MGB(12)
