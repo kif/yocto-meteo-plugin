@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 from __future__ import division, print_function
 from picamera import PiCamera
-from picamera.array import PiRGBArray
 from PIL import Image
 import time 
 import numpy
 import threading
+try:
+    from Queue import Queue
+except:
+    from queue import Queue
 import datetime
 import os
 import sys
@@ -20,9 +23,6 @@ import servo
 from accelero import Accelerometer
 from exposition import Exposition
 
-lens = Exposition()
-acc = ()
-acc.start
 
 Position = namedtuple("Position", ("pan", "tilt"))
 
@@ -31,7 +31,6 @@ trajectory={
 "delay": 20,
 "avg_wb":200,
 "avg_ev":6,
-"avg_speed_nb_img":3,
 "trajectory": [
  {"tilt":30,
   "pan":-50,
@@ -45,8 +44,12 @@ trajectory={
   "pan":-50,
   "stay": 10,
   "move": 1000},
- ]
+ ],
+"histo_ev": [9,9,9,9],
+"wb_red": [1.50390625,1.50390625,1.50390625,1.50390625],
+"wb_blue": [1.56640625,1.56640625,1.56640625,1.56640625]
 }
+
 
 class SavGol(object):
     "Class for Savitsky-Golay filtering"
@@ -67,7 +70,7 @@ class SavGol(object):
             self.cache[l] = scipy.signal.savgol_coeffs(l, self.order, pos=0)
         return numpy.dot(lst, self.cache[l])
 
-SG = [-0.2, 0, 0.2, 0.4, 0.6 ]
+
 class Trajectory(object):
     def __init__(self, config=None, json_file=None):
         self.start_time = time.time()
@@ -150,11 +153,10 @@ class TimeLaps(object):
         self.folder = os.path.abspath(folder)
         self.avg_wb = avg_awb # time laps over which average gains
         self.avg_ev = avg_ev # time laps over which average speed
-        self.avg_speed_nb_img = 3.0
         self.config_file = os.path.abspath(config_file)
         self.red_gains = []
         self.blue_gains = []
-        self.speeds = []
+        self.histo_ev = []
 	self.load_config()
         self.camera = PiCamera(resolution=self.resolution, framerate=self.fps) 
         self.raw = PiRGBArray(self.camera)
@@ -186,36 +188,26 @@ class TimeLaps(object):
                 dico = json.load(jsonfile)
             self.red_gains = dico.get("wb_red", self.red_gains)
             self.blue_gains = dico.get("wb_blue", self.blue_gains)
-            self.speeds = dico.get("speeds", self.speeds)
+            self.histo_ev = dico.get("histo_ev", self.histo_ev)
             self.delay = dico.get("delay", self.delay)
-            self.avg_speed_nb_img = dico.get("avg_speed_nb_img", self.avg_speed_nb_img)
             self.avg_ev = dico.get("avg_ev", self.avg_ev)
             self.avg_wb = dico.get("avg_wb", self.avg_wb)
             
     def save_config(self):
+        histo_ev = self.camera.histo_ev
+        red_gains = self.camera.red_gains
+        blue_gains = self.camera.blue_gains
         dico = OrderedDict([                           
-                            ("speeds", self.speeds),
-                            ("trajectory", self.trajectory.config),
+                            ("delay", self.delay),
                             ("avg_wb", self.avg_wb),
                             ("avg_ev", self.avg_ev),
-                            ("self.avg_speed_nb_img", self.avg_speed_nb_img),
-                            ("delay", self.delay),
+                            ("trajectory", self.trajectory.config),
+                            ("histo_ev", self.histo_ev),
                             ("red_gains", self.red_gains),  
                             ("blue_gains", self.blue_gains)])
         with open(self.config_file,"w") as jsonfile:
-            jsonfile.write(json.dumps(dico, indent=2))
+            jsonfile.write(json.dumps(dico, indent=4))
 
-    def save(self, ary, name, exp_speed=125, iso=100):
-        "save an array"
-        Image.fromarray(ary).save(name, quality=80)
-        exif = pyexiv2.ImageMetadata(name)
-        exif.read()
-        exif["Exif.Photo.ExposureTime"] = Fraction(1, int(round(exp_speed)))
-        exif["Exif.Photo.ISOSpeedRatings"] = iso
-        exif.comment = "pan=%s, tilt=%s"%self.position
-        #exif["Exif.MakerNote.Tilt"] = self.position.tilt
-        exif.write(preserve_timestamps=True)
-    
     def capture(self):
         """Take a picture with the camera, if there is enough light
         """
@@ -292,7 +284,153 @@ class TimeLaps(object):
     def is_valid(self):
        return self.last_speed/self.last_gain >=0.4 
     
+
+class Frame(object):
+    """This class holds one image"""
+    INDEX = 0 
+    sem = threading.Semaphore()
+    def __init__(self, data):
+        "Constructor"
+        self.timestamp = time.time()
+        with self.sem:
+            self.index = self.INDEX
+            self.__class__.INDEX+=1
+
+        self.data = data
+        self.camera_meta = {}
+        self.gravity = None
+        self.position = None
+
+    def save(self):
+        "Save the data as YUV raw data"
+        with open("dump_%s.yuv"%self.timestamp, "w") as f:
+            f.write(self.data)
+        print("Saved frame %i %s"%(self.index, self.timestamp))
+
+    def get_date_time(self):
+        return time.strftime("%Y-%m-%d-%Hh%Mm%Ss", time.localtime(self.timestamp)) 
+
+    @property
+    def rgb(self):
+        "retrieve the image a RGB array" 
+        pass
+
+
+class StreamingOutput(object):
+    """This class handles the stream, it re-cycles a BytesIO and provides frames"""
+    def __init__(self, size):
+        """Constructor
+
+        :param size: size of an image in bytes. 
+        For YUV, it is 1.5x the number of pixel of the padded image.
+        """
+        self.size = size
+        self.frame = None
+        self.buffer = io.BytesIO()
+        self.condition = threading.Condition()
+
+    def write(self, buf):
+        res = self.buffer.write(buf)
+        if self.buffer.tell() >= self.size:
+            #image complete
+            self.buffer.truncate(self.size)
+            # New frame, copy the existing buffer's content and notify all
+            # clients it's available
+            with self.condition:
+                self.frame = Frame(self.buffer.getvalue())
+                self.condition.notify_all()
+            self.buffer.seek(0)
+        else:
+            print("Incomplete buffer of %i bytes"%self.buffer.tell())
+        return res
+
+
+class Camera(threading.Thread):
+    "A class for acquiring continusly images..."
+
+    def __init__(self, resolution=(3280, 2464), framerate=1, image_mode=3, 
+                 ev=None, awb=None, quit_signal=None, queue=None):
+        threading.Thread.__init__(self, name="Camera")
+        self.quit_signal = quit_signal or threading.Signal()
+        self.queue = queue or Queue()
+        raw_size = int(((camera.resolution[0]+31)& ~(31))*((camera.resolution[1]+15)& ~(15))*1.5)
+        self.stream = StreamingOutput(raw_size)
+        self.camera = picamera.PiCamera(resolution=resolution, framerate=framerate, image_mode=image_mode)
+        self.camera.start_preview()
+
+    def __del__(self):
+        self.camera = self.stream = None
+
+    def get_metadata(self)
+        metadata = {"iso": float(camera.ISO),
+                    "analog_gain": float(camera.analog_gain),
+                    "awb_gains": [float(i) for i in camera.awb_gains],
+                    "digital_gain": float(camera.digital_gain),
+                    "exposure_compensation": float(camera.exposure_compensation),
+                    "exposure_speed": float(camera.exposure_speed),
+                    "framerate": float(camera.framerate),
+                    "revision": camera.revision,
+                    "shutter_speed": float(camera.shutter_speed)
+                    "aperture": 2.8,
+                    "resolution": camera.resolution}
+        return metadata
+
+    def set_expo(self, ev):
+        pass
+
+    def set_wb(self, wb):
+        pass
+
+    def run(self):
+        "main thread activity"
+        for foo in self.camera.capture_continuous(self.stream, format='yuv'):
+            if self.stream.frame is not None:
+                frame = stream.frame
+                frame.camera_meta = metadata
+                self.queue.put(frame)
+            if self.quit_signal.is_set():
+                break
+        self.camera.close()
+
+class Saver(threading.thread):
+    "This thread is in charge of saving the frames arriving from the queue on the disk"
+    def __init__(self, directory=".", queue=None, quit_signal=None):
+        threading.Thread(self, name="Saver")
+        self.queue = queue or Queue()
+        self.quit_signal = quit_signal or threading.Signal()
+        self.directory = os.path.abspath(directory)
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory
+
+    def run(self):
+        while not self.quit_signal.is_set():
+            frame = self.queue.get()
+            if frame:
+                name = os.path.join(self.directory, frame.get_date_time()+".jpg")
+                Image.fromarray(frame.rgb).save(name, quality=80)
+                exif = pyexiv2.ImageMetadata(name)
+                exif.read()
+                speed = Fraction(1000000, int(exposure_speed))
+                iso = int(100 * frame.camera_meta.get("digital_gain", 1) * frame.camera_meta.get("analog_gain",1))
+                exif["Exif.Photo.FNumber"] = Fraction(int(frame.camera_meta.get("aperture")*100),100)
+                exif["Exif.Photo.ExposureTime"] = speed
+                exif["Exif.Photo.ISOSpeedRatings"] = iso
+                comments = OrderedDict()
+                if frame.position:
+                    comments["pan"] = frame.position.pan
+                    comments["tilt"] =  frame.position.tilt
+                if frame.gravity:
+                    comments["gx"] = frame.gravity.x
+                    comments["gy"] = frame.gravity.y
+                    comments["gz"] = frame.gravity.z
+                exif.comment = json.dumps(comments)
+                exif.write(preserve_timestamps=True)
+
 if __name__ == "__main__":
+    quit = threading.Signal()
+    lens = Exposition()
+    acc = Accelerometer() 
+    acc.start()
     parser = ArgumentParser("trajlaps", 
                             description="TimeLaps over a trajectory")
     parser.add_argument("-j", "--json", help="config file")

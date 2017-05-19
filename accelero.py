@@ -2,7 +2,7 @@
 
 import logging
 import time
-from mma8451 import MMA8451, RANGE_2G, BW_RATE_6_25HZ
+from mma8451 import MMA8451, RANGE_2G, BW_RATE_6_25HZ, BW_RATE_1_56HZ
 from threading import Thread, Event, Semaphore
 from collections import namedtuple
 
@@ -11,12 +11,12 @@ Gravity = namedtuple("Gravity",["x", "y", "z"])
 
 
 class Accelerometer(Thread):
-    def __init__(self, sensor_range=RANGE_2G, data_rate=BW_RATE_6_25HZ):
+    def __init__(self, sensor_range=RANGE_2G, data_rate=BW_RATE_1_56HZ, quit_event=None):
         Thread.__init__(self, name="Accelerometer")
         self.sem = Semaphore()
         self._can_record = Event()
         self._done_recording = Event()
-        self._quit = Event()
+        self._quit = quit_event or Event()
 
         self.mma8451 = MMA8451(sensor_range=sensor_range,
                                data_rate=data_rate, 
