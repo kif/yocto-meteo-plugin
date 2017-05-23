@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import division, print_function
+import signal
 from picamera import PiCamera
 from PIL import Image
 import time 
@@ -70,15 +71,22 @@ class SavGol(object):
             self.cache[l] = scipy.signal.savgol_coeffs(l, self.order, pos=0)
         return numpy.dot(lst, self.cache[l])
 
+class DummyAccelero(object):
+    """Dummy accelerometer"""
+    def pause(self):
+        pass
+    def resume(self):
+        pass
 
 class Trajectory(object):
-    def __init__(self, config=None, json_file=None):
+    def __init__(self, delay_off=0.5, accelero=None, config=None, json_file=None):
         self.start_time = time.time()
+        self.accelero = accelero or DummyAccelero()
+        self.delay_off = delay_off
         self.config = config or []
         self.servo_tilt = servo.tilt
         self.servo_pan = servo.pan
         self.default_pos = Position(0, 0)
-
         if json_file:
             self.load_config(json_file)
 
@@ -94,9 +102,15 @@ class Trajectory(object):
             data = jf.read()
         config = json.loads(data)
         if "trajectory" in config:
-           self.config = config["trajectory"]
+           self.set_config(config["trajectory"])
         else:
-           self.config = config
+           self.set_config(config)
+
+    def get_config(self):
+        return self.config
+
+    def set_config(self, config):
+        self.config = list(config)
 
     def goto(self, when):
         """move the camera to the position it need to be at a given timestamp"""
@@ -105,14 +119,17 @@ class Trajectory(object):
         return pos
 
     def goto_pos(self, pos):
+        """Move the camera to the given position
+        Operates usually in a separated thread
+		"""
         pan, tilt = pos
-        acc.pause()
+        self.accelero.pause()
         self.servo_tilt.move(tilt)
         self.servo_pan.move(pan)
-        time.sleep(1)
+        time.sleep(self.delay_off)
         self.servo_tilt.off()
         self.servo_pan.off()
-        acc.resume()
+        self.accelero.resume()
  
     def calc_pos(self, when):
         """Calculate the position it need to be at a given timestamp"""
@@ -145,66 +162,67 @@ class Trajectory(object):
 
 
 class TimeLaps(object):
-    def __init__(self, resolution=(2592, 1952), fps=1, delay=360, 
+    def __init__(self, resolution=(2592, 1952), framerate=1, delay=360, 
                  folder=".", avg_awb=200, avg_ev=25, config_file="parameters.json"):
-        self.resolution = resolution
-        self.fps = fps
+        self.camera_queue = Queue()
+        self.analysis_queue = Queue()
+        self.saving_queue = Queue()
+        self.quit_signal = Event()
         self.delay = delay
         self.folder = os.path.abspath(folder)
         self.avg_wb = avg_awb # time laps over which average gains
         self.avg_ev = avg_ev # time laps over which average speed
         self.config_file = os.path.abspath(config_file)
-        self.red_gains = []
-        self.blue_gains = []
-        self.histo_ev = []
-	self.load_config()
-        self.camera = PiCamera(resolution=self.resolution, framerate=self.fps) 
-        self.raw = PiRGBArray(self.camera)
-        self.camera.awb_mode = "auto"
-        self.camera.iso = 0
-        self.camera.shutter_speed = 0
-        self.last_gain = 1
-        self.last_speed = 0
-        self.last_wb = (1,1)
-        self.next_speed = 1
-        self.next_wb = (1,1)
         self.position = Position(0,0)
         self.start_time = self.last_img = time.time()
-        self.next_img = self.last_img + self.delay
-        self.trajectory = Trajectory(json_file=config_file)
-        self.position = self.trajectory.goto(self.delay)
+        self.next_img = self.last_img + 2 * self.delay
+        signal.signal(signal.SIGINT, self.quit)
+        self.accelero = Accelerometer() 
+        self.accelero.start()
+        self.trajectory = Trajectory(accelero=self.accelero)
+        self.camera = Camera(resolution=resolution,                              
+                             queue=self.camera_queue,
+                             framerate = framerate,
+                             avg_ev=avg_ev, 
+                             avg_wb=avg_awb, 
+                             histo_ev=None, 
+                             wb_red=None, 
+                             wb_blue=None 
+                             quit_signal=self.quit_signal, 
+                             queue=self.processing_queue,
+                             )
         self.load_config() 
 
+        self.camera.start()
+        self.position = self.trajectory.goto(self.delay)        
+    
     def __del__(self):
-        self.raw.close()
-        self.camera.close()
-        self.raw = None
+        self.quit_signal.set()
         self.camera = None
         self.trajectory = None
+        self.accelero = None
+
+    def quit(self, *arg, **kwarg):
+        """called with SIGINT: clean up and quit gracefully"""
+        self.quit_signal.set()
 
     def load_config(self):
         if os.path.isfile(self.config_file):
             with open(self.config_file) as jsonfile:
                 dico = json.load(jsonfile)
-            self.red_gains = dico.get("wb_red", self.red_gains)
-            self.blue_gains = dico.get("wb_blue", self.blue_gains)
-            self.histo_ev = dico.get("histo_ev", self.histo_ev)
+            if "trajectory" in dico:
+				self.trjectory = dico["trajectory"] 
+            if "camera" in dico:
+                self.camera.set_config(dico["camera"])
             self.delay = dico.get("delay", self.delay)
-            self.avg_ev = dico.get("avg_ev", self.avg_ev)
-            self.avg_wb = dico.get("avg_wb", self.avg_wb)
             
     def save_config(self):
-        histo_ev = self.camera.histo_ev
-        red_gains = self.camera.red_gains
-        blue_gains = self.camera.blue_gains
+        camera_config = self.camera.get_config()
         dico = OrderedDict([                           
                             ("delay", self.delay),
-                            ("avg_wb", self.avg_wb),
-                            ("avg_ev", self.avg_ev),
                             ("trajectory", self.trajectory.config),
-                            ("histo_ev", self.histo_ev),
-                            ("red_gains", self.red_gains),  
-                            ("blue_gains", self.blue_gains)])
+                            ("camera", camera_config),
+                            ])
         with open(self.config_file,"w") as jsonfile:
             jsonfile.write(json.dumps(dico, indent=4))
 
@@ -349,17 +367,46 @@ class Camera(threading.Thread):
     "A class for acquiring continusly images..."
 
     def __init__(self, resolution=(3280, 2464), framerate=1, image_mode=3, 
-                 ev=None, awb=None, quit_signal=None, queue=None):
+                 avg_ev=21, avg_wb=31, histo_ev=None, wb_red=None, wb_blue=None 
+                 quit_signal=None, queue=None):
+        """
+        """
         threading.Thread.__init__(self, name="Camera")
         self.quit_signal = quit_signal or threading.Signal()
         self.queue = queue or Queue()
-        raw_size = int(((camera.resolution[0]+31)& ~(31))*((camera.resolution[1]+15)& ~(15))*1.5)
+        self.avg_ev = avg_ev
+        self.avg_bw = avg_wb
+        self.histo_ev = histo_ev or []
+        self.wb_red = wb_red or []
+        self.wb_blue = wb.blue or []
+        raw_size = (((resolution[0]+31)& ~(31))*((resolution[1]+15)& ~(15))*3//2)
         self.stream = StreamingOutput(raw_size)
-        self.camera = picamera.PiCamera(resolution=resolution, framerate=framerate, image_mode=image_mode)
+        self.camera = picamera.PiCamera(resolution=resolution, framerate=framerate, image_mode=sensor_mode)
         self.camera.start_preview()
 
     def __del__(self):
         self.camera = self.stream = None
+    
+    def get_config(self):
+        config = OrderedDict(("resolution", tuple(self.camera.resolution)),
+                             ("framerate", float(self.camera.framerate)),
+                             ("sensor_mode", self.camera.sensor_mode),
+                             ("avg_ev", self.avg_ev),
+                             ("avg_wb", self.avg_wb),
+                             ("hist_ev", self.hist_ev),
+                             ("wb_red", self.wb_red),
+                             ("wb_blue". self.wb.blue))
+        return config
+
+    def set_config(self, dico):
+        self.camera.resolution = dico.get("resolution", self.camera.resolution)
+        self.camera.framerate = dico.get("framerate", self.camera.framerate)
+        self.camera.sensor_mode = dico.get("sensor_mode", self.camera.sensor_mode)
+        self.red_gains = dico.get("wb_red", self.red_gains)
+        self.blue_gains = dico.get("wb_blue", self.blue_gains)
+        self.histo_ev = dico.get("histo_ev", self.histo_ev)
+        self.avg_ev = dico.get("avg_ev", self.avg_ev)
+        self.avg_wb = dico.get("avg_wb", self.avg_wb)
 
     def get_metadata(self)
         metadata = {"iso": float(camera.ISO),
@@ -391,6 +438,7 @@ class Camera(threading.Thread):
             if self.quit_signal.is_set():
                 break
         self.camera.close()
+
 
 class Saver(threading.thread):
     "This thread is in charge of saving the frames arriving from the queue on the disk"
@@ -425,24 +473,31 @@ class Saver(threading.thread):
                     comments["gz"] = frame.gravity.z
                 exif.comment = json.dumps(comments)
                 exif.write(preserve_timestamps=True)
+            self.queue.task_done()
+
+class Analyzer(threading.thread):
+    "This thread is in charge of analyzing the image and suggesting new exposure value and white balance"
+    def __init__(self, directory=".", queue=None, quit_signal=None):
+        threading.Thread(self, name="Saver")
+        self.queue = queue or Queue()
+        self.quit_signal = quit_signal or threading.Signal()
+
 
 if __name__ == "__main__":
-    quit = threading.Signal()
-    lens = Exposition()
-    acc = Accelerometer() 
-    acc.start()
     parser = ArgumentParser("trajlaps", 
                             description="TimeLaps over a trajectory")
     parser.add_argument("-j", "--json", help="config file")
     args = parser.parse_args()
-    tl = TimeLaps(resolution=(3296,2464), config_file=args.json)
-    print("Warmup ...")
-    time.sleep(2)
-    tl.measure()
-    while True:
-        tl.capture()
-        #print(time.time(), tl.next_img)
-        while time.time() < tl.next_img:
-            time.sleep(1.0*tl.avg_speed_nb_img*tl.delay/tl.avg_ev)
-            tl.measure()
-    pass
+    tl = TimeLaps(resolution=(config_file=args.json)
+    print("Warmup ... %s seconds"%(2*tl.delay))
+    while not tl.quit_signal.is_set():
+        frame = tl.camera_queue.get()
+        if time.time() < tl.next_img:        
+            tl.analysis_queue.put(frame)
+        else:
+            frame.position = tl.position
+            frame.gravity = tl.accelero.get()
+            tl.saving_queue.put(frame)
+            tl.next_img = frame.timestamp + tl.delay
+            tl.position = tl.trajectory.goto(tl.next_img - tl.start_time)
+        tl.camera_queue.task_done()

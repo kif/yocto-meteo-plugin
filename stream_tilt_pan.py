@@ -310,13 +310,14 @@ class Server(object):
         self.trajectory.append(self.current_pos)
         traj = [{"tilt": i.tilt, "pan": i.pan, "move": 60, "stay":10} 
                 for i in self.trajectory]
+        camera = OrderedDict((("avg_wb", self.avg_wb),
+                              ("avg_ev", self.avg_ev),
+                              ("histo_ev", self.histo_ev),
+                              ("wb_red", self.wb_red),
+                              ("wb_blue", self.wb_blue),))
         dico = OrderedDict((("trajectory", traj),
                             ("delay", 10),
-                            ("avg_wb", self.avg_wb),
-                            ("avg_ev", self.avg_ev),
-                            ("histo_ev", self.histo_ev),
-                            ("wb_red", self.wb_red),
-                            ("wb_blue", self.wb_blue),
+                            ("camera", camera),
                             ))
 
         with open(self.traj_file,"w") as f:
