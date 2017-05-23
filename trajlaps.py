@@ -23,10 +23,11 @@ from argparse import ArgumentParser
 import servo
 from accelero import Accelerometer
 from exposition import Exposition
+from scipy.signal import convolve, gaussian, savgol_coeffs
 
 
 Position = namedtuple("Position", ("pan", "tilt"))
-
+ExpoRedBlue = namedtuple("ExpoRedBlue", ("ev", "red", "blue"))
 
 trajectory={
 "delay": 20,
@@ -59,7 +60,7 @@ class SavGol(object):
         self.order = order
         self.cache = {} #len, filter
 
-    def filter(lst):
+    def __call__(lst):
         "filter a list. the last having the more weight"
         l = len(lst)
         if l%2 == 0:
@@ -68,9 +69,10 @@ class SavGol(object):
         else:
             lst = numpy.array(lst)
         if l not in self.cache:
-            self.cache[l] = scipy.signal.savgol_coeffs(l, self.order, pos=0)
+            self.cache[l] = savgol_coeffs(l, self.order, pos=0)
         return numpy.dot(lst, self.cache[l])
 
+    
 class DummyAccelero(object):
     """Dummy accelerometer"""
     def pause(self):
@@ -167,13 +169,14 @@ class TimeLaps(object):
         self.camera_queue = Queue()
         self.analysis_queue = Queue()
         self.saving_queue = Queue()
-        self.quit_signal = Event()
+        self.quit_event = Event()
         self.delay = delay
         self.folder = os.path.abspath(folder)
         self.avg_wb = avg_awb # time laps over which average gains
         self.avg_ev = avg_ev # time laps over which average speed
         self.config_file = os.path.abspath(config_file)
         self.position = Position(0,0)
+        self.lens = Exposition()
         self.start_time = self.last_img = time.time()
         self.next_img = self.last_img + 2 * self.delay
         signal.signal(signal.SIGINT, self.quit)
@@ -188,8 +191,9 @@ class TimeLaps(object):
                              histo_ev=None, 
                              wb_red=None, 
                              wb_blue=None 
-                             quit_signal=self.quit_signal, 
+                             quit_event=self.quit_event, 
                              queue=self.processing_queue,
+                             lens = self.lens
                              )
         self.load_config() 
 
@@ -197,14 +201,14 @@ class TimeLaps(object):
         self.position = self.trajectory.goto(self.delay)        
     
     def __del__(self):
-        self.quit_signal.set()
+        self.quit_event.set()
         self.camera = None
         self.trajectory = None
         self.accelero = None
 
     def quit(self, *arg, **kwarg):
         """called with SIGINT: clean up and quit gracefully"""
-        self.quit_signal.set()
+        self.quit_event.set()
 
     def load_config(self):
         if os.path.isfile(self.config_file):
@@ -306,18 +310,26 @@ class TimeLaps(object):
 class Frame(object):
     """This class holds one image"""
     INDEX = 0 
-    sem = threading.Semaphore()
+    semclass = threading.Semaphore()
+            # YUV conversion matrix from ITU-R BT.601 version (SDTV)
+            #                  Y       U       V
+    YUV2RGB = numpyp.array([[1.164,  0.000,  1.596],                         # R
+                           [1.164, -0.392, -0.813],                          # G
+                           [1.164,  2.017,  0.000]], dtype=numpy.float32)    # B
+
     def __init__(self, data):
         "Constructor"
         self.timestamp = time.time()
-        with self.sem:
+        with self.semclass:
             self.index = self.INDEX
             self.__class__.INDEX+=1
-
         self.data = data
         self.camera_meta = {}
         self.gravity = None
         self.position = None
+        self.sem = threading.Semaphore()
+        self._yuv = None
+        self._rgb = None
 
     def save(self):
         "Save the data as YUV raw data"
@@ -329,9 +341,42 @@ class Frame(object):
         return time.strftime("%Y-%m-%d-%Hh%Mm%Ss", time.localtime(self.timestamp)) 
 
     @property
+    def yuv(self):
+        """Retrieve the YUV array"""
+        if self._yuv is None:
+            with self.sem:
+                if self._yuv is None:
+                    width, height = self.camera_meta.get("resolution", (640,480))
+                    fwidth = (width + 31) & ~(31)
+                    fheight = (height + 15) & ~ (15)
+                    ylen = fwidth * fheight
+                    a = np.frombuffer(data, dtype=np.uint8)
+                    Y = a[:y_len]
+                    U = a[y_len:-uv_len]
+                    V = a[-uv_len:]
+                    # Reshape the values into two dimensions, and double the size of the
+                    # U and V values (which only have quarter resolution in YUV4:2:0)
+                    Y = Y.reshape((fheight, fwidth))
+                    U = U.reshape((fheight // 2, fwidth // 2)).repeat(2, axis=0).repeat(2, axis=1)
+                    V = V.reshape((fheight // 2, fwidth // 2)).repeat(2, axis=0).repeat(2, axis=1)
+                    # Stack the channels together and crop to the actual resolution
+                    self._yuv = numpy.dstack((Y, U, V))[:height, :width]
+        return self._yuv
+        
+    @property
     def rgb(self):
-        "retrieve the image a RGB array" 
-        pass
+        """retrieve the image a RGB array""" 
+        if  self._rgb is None:
+            if self._yub is None:
+                YUV = numpy.asarray(self.yuv, dtype=numpy.float32)
+            with self.sem:
+                if self._rgb is None:
+                    YUV[:, :, 0]  = YUV[:, :, 0]  - 16.0  # Offset Y by 16
+                    YUV[:, :, 1:] = YUV[:, :, 1:] - 128.0 # Offset UV by 128
+                    # Calculate the dot product with the matrix to produce RGB output,
+                    # clamp the results to byte range and convert to bytes
+                    self._rgb = YUV.dot(self.YUV2RGB.T).clip(0, 255).astype(numpy.uint8)
+        return self._rgb
 
 
 class StreamingOutput(object):
@@ -368,12 +413,16 @@ class Camera(threading.Thread):
 
     def __init__(self, resolution=(3280, 2464), framerate=1, image_mode=3, 
                  avg_ev=21, avg_wb=31, histo_ev=None, wb_red=None, wb_blue=None 
-                 quit_signal=None, queue=None):
-        """
+                 quit_event=None, queue=None, config_queue=None, lens=None):
+        """This thread handles the camera
+        
         """
         threading.Thread.__init__(self, name="Camera")
-        self.quit_signal = quit_signal or threading.Signal()
+        self.quit_event = quit_event or threading.Signal()
         self.queue = queue or Queue()
+        self.config_queue = config_queue or Queue()
+        self.filter = SavGol(order=2)
+        self.lens = lens or Exposition()
         self.avg_ev = avg_ev
         self.avg_bw = avg_wb
         self.histo_ev = histo_ev or []
@@ -382,7 +431,9 @@ class Camera(threading.Thread):
         raw_size = (((resolution[0]+31)& ~(31))*((resolution[1]+15)& ~(15))*3//2)
         self.stream = StreamingOutput(raw_size)
         self.camera = picamera.PiCamera(resolution=resolution, framerate=framerate, image_mode=sensor_mode)
-        self.camera.start_preview()
+        self.camera.awb_mode = "off"
+        self.camera.exposure_mode = "off"
+        self.update_expo()
 
     def __del__(self):
         self.camera = self.stream = None
@@ -422,11 +473,6 @@ class Camera(threading.Thread):
                     "resolution": camera.resolution}
         return metadata
 
-    def set_expo(self, ev):
-        pass
-
-    def set_wb(self, wb):
-        pass
 
     def run(self):
         "main thread activity"
@@ -435,27 +481,64 @@ class Camera(threading.Thread):
                 frame = stream.frame
                 frame.camera_meta = metadata
                 self.queue.put(frame)
-            if self.quit_signal.is_set():
+            if self.quit_event.is_set():
                 break
+            # update the camera settings if needed:
+            if not self.config_queue.empty():
+                while not self.config_queue.empty():
+                    evrb = self.config_queue.get()
+                    if evrb.red:
+                        self.red_gains.append(evrb.red)
+                        self.blue_gains.append(evrb.blue)
+                    self.histo_ev.append(evrb.ev)
+                self.update_expo()    
+
         self.camera.close()
 
+    def update_expo(self):
+        """This method updates the white balance, exposure time and gain
+        according to the history
+        """ 
+        if len(self.red_gains) > self.avg_wb:
+            self.red_gains = self.red_gains[-self.avg_wb:]
+            self.blue_gains = self.blue_gains[-self.avg_wb:]
+        if len(self.histo_ev) > self.avg_ev:
+            self.histo_ev = self.histo_ev[-self.avg_ev:]
+        self.camera.awb_gains = (self.filter(self.red_gains),
+                                 self.filter(self.blue_gains))
+        ev = self.filter(self.histo_ev)
+        speed = self.lens.calc_speed(ev)
+        if speed > self.framerate:
+            camera.shutter_speed = int(1000000. / self.framerate / speed)
+            camera.iso = 100
+        elif speed > self.framerate * 2:
+            camera.shutter_speed = int(2000000. / self.framerate / speed)
+            camera.iso = 200
+        elif speed > self.framerate * 4:
+            camera.shutter_speed = int(4000000. / self.framerate / speed)
+            camera.iso = 400
+        else:
+            camera.shutter_speed = min(int(8000000. / self.framerate / speed), 1000000)
+            camera.iso = 800       
+        #TODO: how to change framerate ? maybe start with low
+        
 
 class Saver(threading.thread):
     "This thread is in charge of saving the frames arriving from the queue on the disk"
-    def __init__(self, directory=".", queue=None, quit_signal=None):
+    def __init__(self, directory=".", queue=None, quit_event=None):
         threading.Thread(self, name="Saver")
         self.queue = queue or Queue()
-        self.quit_signal = quit_signal or threading.Signal()
+        self.quit_event = quit_event or threading.Signal()
         self.directory = os.path.abspath(directory)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory
 
     def run(self):
-        while not self.quit_signal.is_set():
+        while not self.quit_event.is_set():
             frame = self.queue.get()
             if frame:
                 name = os.path.join(self.directory, frame.get_date_time()+".jpg")
-                Image.fromarray(frame.rgb).save(name, quality=80)
+                Image.fromarray(frame.rgb).save(name, quality=90, optimize=True, progressive=True)
                 exif = pyexiv2.ImageMetadata(name)
                 exif.read()
                 speed = Fraction(1000000, int(exposure_speed))
@@ -475,22 +558,61 @@ class Saver(threading.thread):
                 exif.write(preserve_timestamps=True)
             self.queue.task_done()
 
+
 class Analyzer(threading.thread):
     "This thread is in charge of analyzing the image and suggesting new exposure value and white balance"
-    def __init__(self, directory=".", queue=None, quit_signal=None):
+    def __init__(self, directory=".", queue=None, quit_event=None, lens=None):
         threading.Thread(self, name="Saver")
         self.queue = queue or Queue()
-        self.quit_signal = quit_signal or threading.Signal()
+        self.quit_event = quit_event or threading.Signal()
+        self.lens = lens or Exposition()
+        self.history = []
+        self.max_size = 100
+        
+        i = numpy.arange(40)
+        j= 0.5 ** (0.25 * i)
+        k = ((j + 0.099) / 1.099) ** (1 / 0.45) * (235 - 16) + 16
+        m2 = j < 0.018
+        k[m2] = (235-16) / 4.5 * j[m2] + 16
+        kr = numpy.round(k).astype(int)
+        ukr = numpy.concatenate(([0],numpy.sort(numpy.unique(kr)),[256]))
+        start = -0.25*(ukr.size-1)+0.5
+        self.delta_expo = numpy.arange(start,0.5, 0.25)
+        
+
+        self.g19_2 = gaussian(19, 2)
+        self.g19_2 /= self.g19_2.sum()
+
+    def run(self):
+        """This executed in a thread"""
+        while not self.quit_event.is_set():
+            frame = self.queue.get()
+            ev = self.lens.calc_EV(1000000/frame.camera_meta.get("exposure_speed",1)
+            yprime = frame.yuv[:,:,0]
+            cnt = numpy.bincount(yprime, minlength=256)
+            cs = numpy.zeros(257, int)
+            cs[1:] = numpy.cumsum(cnt)
+            dev = cs[ukr[1:]]-cs[ukr[:-1]]
+            cnv = convolve(dev, g19_2, mode="same")
+            idx = cnv.argmax()
+            dev = self.delta_expo[idx]-0.5*(cnv[idx+1]-cnv[idx-1])/(cnv[idx+1]+cnv[idx-1]-2*cnv[idx])
 
 
 if __name__ == "__main__":
+    try: 
+        from rfoo.utils import rconsole
+    except:
+        pass
+    else:
+        rconsole.spawn_server()
+
     parser = ArgumentParser("trajlaps", 
                             description="TimeLaps over a trajectory")
     parser.add_argument("-j", "--json", help="config file")
     args = parser.parse_args()
     tl = TimeLaps(resolution=(config_file=args.json)
     print("Warmup ... %s seconds"%(2*tl.delay))
-    while not tl.quit_signal.is_set():
+    while not tl.quit_event.is_set():
         frame = tl.camera_queue.get()
         if time.time() < tl.next_img:        
             tl.analysis_queue.put(frame)
