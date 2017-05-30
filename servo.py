@@ -80,5 +80,5 @@ class TSS11MGB(Servo):
 
 pan = M15S(14, reverse=True, offset=-90)
 #tilt = SG90(15, reverse=False, offset=-90)
-tilt = MG92b(15, reverse=False, offset=-80)
+tilt = MG92b(15, reverse=False, offset=-80+26)
 #tss = TSS11MGB(12)

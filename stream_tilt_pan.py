@@ -188,8 +188,6 @@ class Server(object):
         grav = acc.get()
         dico["gravity"] = grav
         if grav:
-            #g = sqrt(grav.x*grav.x+grav.y*grav.y+grav.z*grav.z)
-            #m_tilt = 180.0 * acos(-grav.z/g) / pi * sign(-grav.y)
             m_tilt = 180.0 * atan2(-grav.y, -grav.z) / pi
             m_roll = 180.0 * atan2(-grav.x, -grav.z) / pi
         else:

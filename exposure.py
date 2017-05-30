@@ -34,9 +34,10 @@ class Exposure(object):
         """Calculate the speed needed at given exposure value, in 1/s"""
         return pow(2.0, ev) / self.aperture**2
 
+lens = Exposure()
 
 if __name__ == "__main__":
-    lens = Exposure()
+    
     for ev in range(20):
         s = lens.calc_speed(ev)
         if s<1:
