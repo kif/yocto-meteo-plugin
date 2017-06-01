@@ -108,12 +108,14 @@ class Trajectory(object):
 		"""
         pan, tilt = pos
         self.accelero.pause()
+        self.camera.pause()
         self.servo_tilt.move(tilt)
         self.servo_pan.move(pan)
         time.sleep(self.delay_off)
         self.servo_tilt.off()
         self.servo_pan.off()
         self.accelero.resume()
+        self.camera.resume()
  
     def calc_pos(self, when):
         """Calculate the position it need to be at a given timestamp"""
