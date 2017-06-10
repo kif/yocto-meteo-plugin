@@ -166,6 +166,7 @@ class TimeLaps(threading.Thread):
         self.camera_queue = Queue()
         self.analysis_queue = Queue()
         self.saving_queue = Queue()
+        self.config_queue = Queue()
         self.quit_event = threading.Event()
         self.delay = delay
         self.folder = os.path.abspath(folder)
@@ -182,20 +183,25 @@ class TimeLaps(threading.Thread):
         self.folder = folder
         
         self.camera = Camera(resolution=resolution,                              
-                             queue=self.camera_queue,
                              framerate = framerate,
                              avg_ev=avg_ev, 
                              avg_wb=avg_awb, 
                              histo_ev=None, 
                              wb_red=None, 
                              wb_blue=None,
+                             queue=self.camera_queue,
+                             config_queue=self.config_queue,
                              quit_event=self.quit_event,
                              )
         self.load_config(config_file) 
         self.saver = Saver(folder=self.folder,
                            queue=self.saving_queue, 
                            quit_event=self.quit_event)
+        self.analyzer = Analyzer(frame_queue=self.analysis_queue, 
+                                 config_queue=self.config_queue, 
+                                 quit_event=self.quit_event)
         self.saver.start()
+        self.analyzer.start()
         self.position = self.trajectory.goto(self.delay)  
         self.camera.warm_up()      
         self.camera.start()
@@ -242,6 +248,7 @@ class TimeLaps(threading.Thread):
         while not self.quit_event.is_set():
             frame = self.camera_queue.get()
             frame.position = self.position
+            self.analysis_queue.put(frame)
             if self.position in self.storage:
                 self.storage[self.position].append(frame) 
             else:
@@ -255,85 +262,88 @@ class TimeLaps(threading.Thread):
                     self.trajectory.goto_pos(next_pos)
                     self.position = next_pos
             self.camera_queue.task_done()
+            logger.info("Length of queues: camera_queue %s, analysis_queue %s saving_queue %s", 
+                            self.camera_queue.qsize(), 
+                            self.analysis_queue.qsize(),
+                            self.saving_queue.qsize())
+                            
+#    def capture(self):
+#        """Take a picture with the camera, if there is enough light
+#        #unused
+#        """
+#        if not self.is_valid:
+#            print("Skipped, low light Speed %.3f/iso%.0f"%(self.last_speed, self.last_gain))
+#            self.last_img = time.time()
+#            self.next_img = self.last_img + self.delay
+#            return     
+#        ns = self.next_speed
+#        iso = 100
+#        while (ns < 4) and (iso < 800):
+#            iso *= 2
+#            ns *= 2
+#        if ns < 1.0:
+#            ns = 1.0
+#        if iso > 800:
+#            iso = 800
+#        self.camera.awb_mode = 'off'
+#        self.camera.awb_gains = self.next_wb
+#        self.camera.iso = iso
+#        self.camera.shutter_speed = int(round(1e6/ns))
+#        self.last_img = time.time()
+#        self.next_img = self.last_img + self.delay
+#        fname = datetime.datetime.fromtimestamp(self.last_img).strftime("%Y-%m-%d-%Hh%Mm%Ss.jpg")
+#        print("%s s/%.3f iso %i, expected speed=%.3f R=%.3f B=%.3f"%(fname, ns, iso, self.next_speed, self.next_wb[0], self.next_wb[1]))
+#        self.camera.capture(self.raw, "rgb")
+#        threading.Thread(target=self.save,args=(self.raw.array.copy(), fname, ns, iso)).start()
+#        #self.save(self.raw.array, fname, ns, iso)
+#        self.raw.truncate(0)
+#        self.camera.awb_mode = "auto"
+#        self.camera.iso = 0
+#        self.camera.shutter_speed = 0
+#        self.position = self.trajectory.goto(self.next_img - self.start_time)
+#
+#    def measure(self):
+#        "#unused"   
+#        self.camera.capture(self.raw, 'rgb')
+#        self.raw.truncate(0)
+#        r,b = self.camera.awb_gains
+#        print("Measured exposure_speed: %f analog_gain: %f digital_gain: %f"%(self.camera.exposure_speed, self.camera.analog_gain, self.camera.digital_gain))
+#        self.last_speed = 1.0e6 / self.camera.exposure_speed
+#        self.last_gain = 1.0 * self.camera.analog_gain * self.camera.digital_gain
+#        if not self.is_valid:
+#            return
+#        r = 1.0 * r
+#        b = 1.0 * b
+#        if r == 0.0: 
+#            r = 1.0
+#        if b == 0.0:
+#            b = 1.0
+#
+#        self.last_wb = (r, b)
+#        ls = self.last_speed / self.last_gain
+#        self.red_gains.append(r)
+#        self.blue_gains.append(b)
+#        self.speeds.append(math.log(ls, 2.0))
+#        if len(self.red_gains) > self.avg_wb:
+#            self.red_gains = self.red_gains[-self.avg_wb:]
+#            self.blue_gains = self.blue_gains[-self.avg_wb:]
+#        if len(self.speeds) > self.avg_ev:
+#           self.speeds = self.speeds[-self.avg_ev:]
+#        if len(self.speeds) < len(SG):
+#            self.speeds += [self.speeds[-1]] * (len(SG) - len(self.speeds))
+#        rg = sum(self.red_gains)/len(self.red_gains)
+#        bg = sum(self.blue_gains)/len(self.blue_gains)
+#        mgspeed = sum(i*j for i,j in zip(SG, self.speeds[-len(SG):]))
+#        ns = 2.0 ** (mgspeed)
+#        #ns = 2.0 ** (sum(self.speeds)/len(self.speeds))
+#        print("len %s/%s, \t S %.3f/iso%.0f -> %.3f \t R %.3f-> %.3f \t B %.3f -> %.3f"%(len(self.red_gains),len(self.speeds), self.last_speed, 100.*self.last_gain, ns, r, rg, b, bg))
+#        self.next_speed = ns
+#        self.next_wb = rg,bg
+#        self.save_config()
 
-
-    def capture(self):
-        """Take a picture with the camera, if there is enough light
-        #unused
-        """
-        if not self.is_valid:
-            print("Skipped, low light Speed %.3f/iso%.0f"%(self.last_speed, self.last_gain))
-            self.last_img = time.time()
-            self.next_img = self.last_img + self.delay
-            return     
-        ns = self.next_speed
-        iso = 100
-        while (ns < 4) and (iso < 800):
-            iso *= 2
-            ns *= 2
-        if ns < 1.0:
-            ns = 1.0
-        if iso > 800:
-            iso = 800
-        self.camera.awb_mode = 'off'
-        self.camera.awb_gains = self.next_wb
-        self.camera.iso = iso
-        self.camera.shutter_speed = int(round(1e6/ns))
-        self.last_img = time.time()
-        self.next_img = self.last_img + self.delay
-        fname = datetime.datetime.fromtimestamp(self.last_img).strftime("%Y-%m-%d-%Hh%Mm%Ss.jpg")
-        print("%s s/%.3f iso %i, expected speed=%.3f R=%.3f B=%.3f"%(fname, ns, iso, self.next_speed, self.next_wb[0], self.next_wb[1]))
-        self.camera.capture(self.raw, "rgb")
-        threading.Thread(target=self.save,args=(self.raw.array.copy(), fname, ns, iso)).start()
-        #self.save(self.raw.array, fname, ns, iso)
-        self.raw.truncate(0)
-        self.camera.awb_mode = "auto"
-        self.camera.iso = 0
-        self.camera.shutter_speed = 0
-        self.position = self.trajectory.goto(self.next_img - self.start_time)
-
-    def measure(self):
-        "#unused"   
-        self.camera.capture(self.raw, 'rgb')
-        self.raw.truncate(0)
-        r,b = self.camera.awb_gains
-        print("Measured exposure_speed: %f analog_gain: %f digital_gain: %f"%(self.camera.exposure_speed, self.camera.analog_gain, self.camera.digital_gain))
-        self.last_speed = 1.0e6 / self.camera.exposure_speed
-        self.last_gain = 1.0 * self.camera.analog_gain * self.camera.digital_gain
-        if not self.is_valid:
-            return
-        r = 1.0 * r
-        b = 1.0 * b
-        if r == 0.0: 
-            r = 1.0
-        if b == 0.0:
-            b = 1.0
-
-        self.last_wb = (r, b)
-        ls = self.last_speed / self.last_gain
-        self.red_gains.append(r)
-        self.blue_gains.append(b)
-        self.speeds.append(math.log(ls, 2.0))
-        if len(self.red_gains) > self.avg_wb:
-            self.red_gains = self.red_gains[-self.avg_wb:]
-            self.blue_gains = self.blue_gains[-self.avg_wb:]
-        if len(self.speeds) > self.avg_ev:
-           self.speeds = self.speeds[-self.avg_ev:]
-        if len(self.speeds) < len(SG):
-            self.speeds += [self.speeds[-1]] * (len(SG) - len(self.speeds))
-        rg = sum(self.red_gains)/len(self.red_gains)
-        bg = sum(self.blue_gains)/len(self.blue_gains)
-        mgspeed = sum(i*j for i,j in zip(SG, self.speeds[-len(SG):]))
-        ns = 2.0 ** (mgspeed)
-        #ns = 2.0 ** (sum(self.speeds)/len(self.speeds))
-        print("len %s/%s, \t S %.3f/iso%.0f -> %.3f \t R %.3f-> %.3f \t B %.3f -> %.3f"%(len(self.red_gains),len(self.speeds), self.last_speed, 100.*self.last_gain, ns, r, rg, b, bg))
-        self.next_speed = ns
-        self.next_wb = rg,bg
-        self.save_config()
-
-    @property
-    def is_valid(self):
-       return self.last_speed/self.last_gain >=0.4 
+#    @property
+#    def is_valid(self):
+#       return self.last_speed/self.last_gain >=0.4 
     
 
 if __name__ == "__main__":
