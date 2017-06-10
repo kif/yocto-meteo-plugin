@@ -4,6 +4,7 @@ import os
 from collections import namedtuple, OrderedDict
 import time
 import threading
+import json
 try:
     from Queue import Queue
 except ImportError:
@@ -18,6 +19,12 @@ from picamera import PiCamera
 from scipy.signal import convolve, gaussian, savgol_coeffs
 from exposure import lens
 logger = logging.getLogger("camera")
+
+try:
+    import colors
+except ImportError:
+    logger.warning("Colors module not available, using slow Python implementation")
+    colors = None
 
 ExpoRedBlue = namedtuple("ExpoRedBlue", ("ev", "dev", "over", "red", "green", "blue"))
 
@@ -46,13 +53,14 @@ savgol = SavGol()
 
 class Frame(object):
     """This class holds one image"""
+    BINNING = 1
     INDEX = 0
     semclass = threading.Semaphore()
             # YUV conversion matrix from ITU-R BT.601 version (SDTV)
             #                  Y       U       V
     YUV2RGB = numpy.array([[1.164,  0.000,  1.596],                          # R
                            [1.164, -0.392, -0.813],                          # G
-                           [1.164,  2.017,  0.000]], dtype=numpy.float32).T  # B
+                           [1.164,  2.017,  0.000]]).T                       # B
 
     def __init__(self, data):
         "Constructor"
@@ -67,54 +75,115 @@ class Frame(object):
         self.sem = threading.Semaphore()
         self._yuv = None
         self._rgb = None
+        self._histograms = None
 
-    def save(self):
-        "Save the data as YUV raw data"
-        fname = self.get_date_time()+".yuv"
-        with open(fname, "w") as f:
-            f.write(self.data)
-        logger.info("Saved YUV raw data %i %s", self.index, fname)
+    def __repr__(self):
+        return "Frame #%04i"%self.index
 
     def get_date_time(self):
         return time.strftime("%Y-%m-%d-%Hh%Mm%Ss", time.localtime(self.timestamp)) 
 
     @property
     def yuv(self):
-        """Retrieve the YUV array"""
+        """Retrieve the YUV array, binned 2x2 or not depending on the BINNING class attribute"""
         if self._yuv is None:
             with self.sem:
                 if self._yuv is None:
-                    width, height = self.camera_meta.get("resolution", (640, 480))
-                    fwidth = (width + 31) & ~(31)
-                    fheight = (height + 15) & ~ (15)
-                    ylen = fwidth * fheight
-                    uvlen = ylen // 4
-                    ary = numpy.frombuffer(self.data, dtype=numpy.uint8)
-                    Y = ary[:ylen]
-                    U = ary[ylen: - uvlen]
-                    V = ary[-uvlen:]
-                    # Reshape the values into two dimensions, and double the size of the
-                    # U and V values (which only have quarter resolution in YUV4:2:0)
-                    Y = Y.reshape((fheight, fwidth))
-                    U = U.reshape((fheight // 2, fwidth // 2)).repeat(2, axis=0).repeat(2, axis=1)
-                    V = V.reshape((fheight // 2, fwidth // 2)).repeat(2, axis=0).repeat(2, axis=1)
-                    # Stack the channels together and crop to the actual resolution
-                    self._yuv = numpy.dstack((Y, U, V))[:height, :width]
+                    resolution = self.camera_meta.get("resolution", (640, 480))
+                    if colors:
+                        yuv = colors.yuv420_to_yuv(self.data, resolution)[0]
+                    else:
+                        width, height = resolution
+                        fwidth = (width + 31) & ~(31)
+                        fheight = (height + 15) & ~ (15)
+                        ylen = fwidth * fheight
+                        uvlen = ylen // 4
+                        ary = numpy.frombuffer(self.data, dtype=numpy.uint8)
+                        if self.BINNING == 2:
+                            Y_full = (ary[:ylen]).astype(numpy.int16)
+                            Y_full.shape = (fheight, fwidth)                        
+                            Y = (Y_full[::2, ::2] + Y_full[::2, 1::2] + Y_full[1::2, ::2] + Y_full[1::2, 1::2]) // 4
+                            U = ary[ylen: - uvlen].reshape((fheight // 2, fwidth // 2))
+                            V = ary[-uvlen:].reshape((fheight // 2, fwidth // 2))
+                            yuv = numpy.dstack((Y.astype(numpy.uint8), U, V))[:height // 2, :width // 2, :]
+                        else:
+                            # Reshape the values into two dimensions, and double the size of the
+                            # U and V values (which only have quarter resolution in YUV4:2:0)
+                            Y = (ary[:ylen]).reshape((fheight, fwidth))
+                            U = (ary[ylen: - uvlen]).reshape((fheight // 2, fwidth // 2)).repeat(2, axis=0).repeat(2, axis=1)
+                            V = (ary[-uvlen:]).reshape((fheight // 2, fwidth // 2)).repeat(2, axis=0).repeat(2, axis=1)
+                            # Stack the channels together and crop to the actual resolution
+                            yuv = numpy.dstack((Y, U, V))[:height, :width, :]
+                    self._yuv = yuv
         return self._yuv
-
+    
     @property
     def rgb(self):
-        """retrieve the image a RGB array"""
+        """retrieve the image a RGB array. Takes 13s"""
         if  self._rgb is None:
-            YUV = numpy.asarray(self.yuv, dtype=numpy.float32)
+            if colors is None:
+                YUV = self.yuv.astype(numpy.int16)
             with self.sem:
                 if self._rgb is None:
-                    YUV[:, :, 0] = YUV[:, :, 0] - 16.0  # Offset Y by 16
-                    YUV[:, :, 1:] = YUV[:, :, 1:] - 128.0 # Offset UV by 128
-                    # Calculate the dot product with the matrix to produce RGB output,
-                    # clamp the results to byte range and convert to bytes
-                    self._rgb = YUV.dot(self.YUV2RGB).clip(0, 255).astype(numpy.uint8)
+                    if colors:
+                        resolution = self.camera_meta.get("resolution", (640, 480))
+                        self._rgb, self._histograms = colors.yuv420_to_rgb(self.data, resolution)
+                    else:
+                        YUV[:, :, 0] = YUV[:, :, 0] - 16  # Offset Y by 16
+                        YUV[:, :, 1:] = YUV[:, :, 1:] - 128 # Offset UV by 128
+                        # Calculate the dot product with the matrix to produce RGB output,
+                        # clamp the results to byte range and convert to bytes
+                        self._rgb = YUV.dot(self.YUV2RGB).clip(0, 255).astype(numpy.uint8)
         return self._rgb
+    
+    @property
+    def histograms(self):
+        """Calculate the 4 histograms with Y,R,G,B"""
+        if  self._histograms is None:
+            if colors is None:
+                histograms = numpy.zeros((4, 256), numpy.int32)
+                histograms[0] = numpy.bincount(self.yuv[:, :, 0].ravel(), minlength=256)
+                histograms[1] = numpy.bincount(self.rgb[:, :, 0].ravel(), minlength=256)
+                histograms[2] = numpy.bincount(self.rgb[:, :, 1].ravel(), minlength=256)
+                histograms[3] = numpy.bincount(self.rgb[:, :, 2].ravel(), minlength=256)
+                self._histograms = histograms
+            else:
+                rgb = self.rgb
+        return self._histograms
+                
+                
+    @staticmethod
+    def load(cls, fname):
+        """load the raw data on one side and the header on the other"""
+        
+        with open(fname) as f:
+            new = cls(f.read())
+        jf = fname[:-3] + "json"
+        if os.path.exists(jf):
+            with open(jf) as f:
+                new.camera_meta = json.load(f)
+        if "index" in new.camera_meta:
+            new.index = new.camera_meta["index"]
+        return new
+        
+    def save(self):
+        "Save the data as YUV raw data"
+        fname = self.get_date_time()+".yuv"
+        with open(fname, "w") as f:
+            f.write(self.data)
+        fname = self.get_date_time()+".json"
+        comments = OrderedDict((("index", self.index)))
+        if frame.position:
+            comments["pan"] = frame.position.pan
+            comments["tilt"] = frame.position.tilt
+        if frame.gravity:
+            comments["gx"] = frame.gravity.x
+            comments["gy"] = frame.gravity.y
+            comments["gz"] = frame.gravity.z
+        comments.update(frame.camera_meta)
+        with open(fname, "w") as f:
+            f.write(json.dumps(comments, indent=4))
+        logger.info("Saved YUV raw data %i %s", self.index, fname)
 
 
 class StreamingOutput(object):
@@ -177,7 +246,7 @@ class Camera(threading.Thread):
     
     def quit(self):
         "quit the main loop and end the thread"
-        self._quit.set()
+        self.quit_event.set()
 
     def pause(self):
         "pause the recording, wait for the current value to be acquired"
@@ -211,7 +280,7 @@ class Camera(threading.Thread):
         self.avg_wb = dico.get("avg_wb", self.avg_wb)
 
     def get_metadata(self):
-        metadata = {#"iso": float(self.camera.ISO),
+        metadata = {"iso": float(self.camera.iso),
                     "analog_gain": float(self.camera.analog_gain),
                     "awb_gains": [float(i) for i in self.camera.awb_gains],
                     "digital_gain": float(self.camera.digital_gain),
@@ -223,17 +292,26 @@ class Camera(threading.Thread):
                     "aperture": lens.aperture,
                     "resolution": self.camera.resolution}
         if metadata['revision'] == "imx219":
-            metadata['iso'] = 54.347826086956516 * metadata["analog_gain"] * metadata["digital_gain"]
+            metadata['iso_calc'] = 54.347826086956516 * metadata["analog_gain"] * metadata["digital_gain"]
         else:
-            metadata['iso'] = 100.0 * metadata["analog_gain"] * metadata["digital_gain"]
+            metadata['iso_calc'] = 100.0 * metadata["analog_gain"] * metadata["digital_gain"]
         return metadata
 
+    def warm_up(self, delay=10):
+        "warm up the camera"
+        framerate = self.camera.framerate
+        self.camera.awb_mode = "auto"
+        self.camera.exposure_mode = "auto"
+        self.camera.framerate = 10
+        logger.info("warming up the camera for %ss",delay)
+        time.sleep(delay)
+        self.camera.framerate = framerate
 
     def run(self):
         "main thread activity"
-        self.camera.awb_mode = "off"
-        self.camera.exposure_mode = "off"
-        self.update_expo()
+        self.camera.awb_mode = "auto"
+        self.camera.exposure_mode = "verylong"
+        
         
         self._done_recording.clear()
         for foo in self.camera.capture_continuous(self.stream, format='yuv'):
@@ -248,14 +326,14 @@ class Camera(threading.Thread):
             if self.quit_event.is_set():
                 break
             # update the camera settings if needed:
-            if not self.config_queue.empty():
-                while not self.config_queue.empty():
-                    evrb = self.config_queue.get()
-                    if evrb.red:
-                        self.wb_red.append(evrb.red)
-                        self.wb_blue.append(evrb.blue)
-                    self.histo_ev.append(evrb.ev)
-                self.update_expo()    
+            #if not self.config_queue.empty():
+            #    while not self.config_queue.empty():
+            #        evrb = self.config_queue.get()
+            #        if evrb.red:
+            #            self.wb_red.append(evrb.red)
+            #            self.wb_blue.append(evrb.blue)
+            #        self.histo_ev.append(evrb.ev)
+            #    self.update_expo()    
             self._can_record.wait()
             self._done_recording.clear()
         self.camera.close()
@@ -264,6 +342,7 @@ class Camera(threading.Thread):
         """This method updates the white balance, exposure time and gain
         according to the history
         """ 
+        return #disabled for now
         if len(self.wb_red) * len(self.wb_blue) * len(self.histo_ev) == 0:
             return
         if len(self.wb_red) > self.avg_wb:
@@ -271,8 +350,8 @@ class Camera(threading.Thread):
             self.wb_blue = self.wb_blue[-self.avg_wb:]
         if len(self.histo_ev) > self.avg_ev:
             self.histo_ev = self.histo_ev[-self.avg_ev:]
-        self.camera.awb_gains = (savgol(self.red_gains),
-                                 savgol(self.blue_gains))
+        self.camera.awb_gains = (savgol(self.wb_red),
+                                 savgol(self.wb_blue))
         ev = savgol(self.histo_ev)
         speed = lens.calc_speed(ev)
         if speed > self.framerate:
@@ -292,29 +371,42 @@ class Camera(threading.Thread):
 
 class Saver(threading.Thread):
     "This thread is in charge of saving the frames arriving from the queue on the disk"
-    def __init__(self, directory=".", queue=None, quit_event=None):
-        threading.Thread(self, name="Saver")
+    def __init__(self, folder="/mnt", queue=None, quit_event=None):
+        threading.Thread.__init__(self, name="Saver")
         self.queue = queue or Queue()
         self.quit_event = quit_event or threading.Signal()
-        self.directory = os.path.abspath(directory)
-        if not os.path.exists(self.directory):
-            os.makedirs(self.directory)
+        self.folder = os.path.abspath(folder)
+        if not os.path.exists(self.folder):
+            os.makedirs(self.folder)
 
     def run(self):
         while not self.quit_event.is_set():
-            frame = self.queue.get()
-            if frame:
-                name = os.path.join(self.directory, frame.get_date_time()+".jpg")
+            t0 = time.time()
+            frames = self.queue.get()
+            if frames:
+                frame = frames.pop()
+                if not frame:
+                    continue
+                comments = OrderedDict((("index", frame.index),
+                                        ("summed", 1)))
+                exposure_speed = frame.camera_meta.get("exposure_speed", 1)
+                while frames and exposure_speed > 0.5*1e6/frame.camera_meta.get("framerate") and (frame.yuv[:, :, 0].max() < 200):
+                    other = frames.pop()
+                    #TODO: merge in linear RGB space
+                    frame.yuv[:, :, 0] = (frame.yuv[:, :, 0].astype(int) + other.yuv[:, :, 0]).clip(0,235)
+                    comments["summed"] += 1
+                    exposure_speed = other.camera_meta.get("exposure_speed", 1)                    
+                    
+                name = os.path.join(self.folder, frame.get_date_time()+".jpg")
+                logger.info("Save frame #%i as %s sum of %i", frame.index, name, comments["summed"])
                 Image.fromarray(frame.rgb).save(name, quality=90, optimize=True, progressive=True)
                 exif = pyexiv2.ImageMetadata(name)
                 exif.read()
-                exposure_speed = frame.camera_meta.get("exposure_speed", 1)
-                speed = Fraction(1000000, int(exposure_speed))
-                iso = int(100 * frame.camera_meta.get("digital_gain", 1) * frame.camera_meta.get("analog_gain", 1))
+                speed = Fraction(int(exposure_speed), 1000000)
+                iso = int(frame.camera_meta.get("iso_calc"))
                 exif["Exif.Photo.FNumber"] = Fraction(int(frame.camera_meta.get("aperture") * 100), 100)
                 exif["Exif.Photo.ExposureTime"] = speed
                 exif["Exif.Photo.ISOSpeedRatings"] = iso
-                comments = OrderedDict()
                 if frame.position:
                     comments["pan"] = frame.position.pan
                     comments["tilt"] = frame.position.tilt
@@ -322,15 +414,17 @@ class Saver(threading.Thread):
                     comments["gx"] = frame.gravity.x
                     comments["gy"] = frame.gravity.y
                     comments["gz"] = frame.gravity.z
+                comments.update(frame.camera_meta)
                 exif.comment = json.dumps(comments)
                 exif.write(preserve_timestamps=True)
             self.queue.task_done()
+            logger.info("Saving of frame #%i took %.3fs", frame.index, time.time() - t0)
 
 
 class Analyzer(threading.Thread):
     "This thread is in charge of analyzing the image and suggesting new exposure value and white balance"
     def __init__(self, queue=None, quit_event=None):
-        threading.Thread(self, name="Saver")
+        threading.Thread.__init__(self, name="Analyzer")
         self.queue = queue or Queue()
         self.quit_event = quit_event or threading.Signal()
         self.history = []

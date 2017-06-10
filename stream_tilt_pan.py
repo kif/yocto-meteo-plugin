@@ -277,6 +277,9 @@ class Server(object):
         self.streamout = StreamingOutput()
         self.cam = PiCamera(resolution=self.resolution, framerate=1, sensor_mode=3)
         self.cam.start_recording(self.streamout, format='mjpeg')
+        self.cam.awb_mode = "off"
+        self.cam.awb_gains = (1.0, 1.0)
+
  
     def capture(self):
         now = datetime.datetime.now().strftime("%Y-%m-%d-%Hh%Mm%Ss")
@@ -308,13 +311,16 @@ class Server(object):
         self.trajectory.append(self.current_pos)
         traj = [{"tilt": i.tilt, "pan": i.pan, "move": 60, "stay":10} 
                 for i in self.trajectory]
-        camera = OrderedDict((("avg_wb", self.avg_wb),
+        camera = OrderedDict((("sensor_mode", 3),
+                              ("framerate", 1),
+                              ("avg_wb", self.avg_wb),
                               ("avg_ev", self.avg_ev),
                               ("histo_ev", self.histo_ev),
                               ("wb_red", self.wb_red),
                               ("wb_blue", self.wb_blue),))
         dico = OrderedDict((("trajectory", traj),
                             ("delay", 10),
+                            ("folder", "."),
                             ("camera", camera),
                             ))
 

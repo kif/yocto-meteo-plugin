@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 from __future__ import division, print_function
+
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("trajlaps")
+
+
 import signal
 from picamera import PiCamera
 
@@ -20,10 +26,8 @@ from collections import namedtuple, OrderedDict
 from argparse import ArgumentParser
 import servo
 from accelero import Accelerometer
-from exposition import Exposition
+from exposure import lens
 from camera import Camera, Saver, Analyzer, Frame
-import logging
-logger = logging.getLogger("camera")
 
 
 Position = namedtuple("Position", ("pan", "tilt"))
@@ -63,16 +67,20 @@ class DummyAccelero(object):
         pass
 
 class Trajectory(object):
-    def __init__(self, delay_off=0.5, accelero=None, config=None, json_file=None):
+    def __init__(self, delay_off=1, accelero=None, camera=None, config=None, json_file=None):
         self.start_time = time.time()
         self.accelero = accelero or DummyAccelero()
+        self.camera = camera or DummyAccelero()
         self.delay_off = delay_off
         self.config = config or []
         self.servo_tilt = servo.tilt
         self.servo_pan = servo.pan
         self.default_pos = Position(0, 0)
+        
         if json_file:
             self.load_config(json_file)
+        self.goto_pos(self.default_pos)
+        
 
     @property
     def duration(self):
@@ -95,10 +103,12 @@ class Trajectory(object):
 
     def set_config(self, config):
         self.config = list(config)
+        logger.info("Config set to :%s ", self.config)
 
     def goto(self, when):
         """move the camera to the position it need to be at a given timestamp"""
         pos = self.calc_pos(when)
+        logger.info(pos)
         threading.Thread(target=self.goto_pos,args=(pos,)).start()
         return pos
 
@@ -119,10 +129,11 @@ class Trajectory(object):
  
     def calc_pos(self, when):
         """Calculate the position it need to be at a given timestamp"""
-        last_pos = self.default_pos
+        next_pos = last_pos = self.default_pos
         last_timestamp = remaining = when
         if remaining <= 0:
             return last_pos
+        #print(self.config)
         for point in self.config:
             next_pos = Position(point.get("pan",0), point.get("tilt",0))
             #print(last_pos, next_pos)
@@ -135,7 +146,7 @@ class Trajectory(object):
             last_timestamp = remaining
             last_pos = next_pos
         else:
-            #we ran out pof points: stay on the last
+            #we ran out of points: stay on the last
             return next_pos
         delta = last_timestamp - remaining
         delta_p = next_pos.pan - last_pos.pan
@@ -147,26 +158,29 @@ class Trajectory(object):
         return Position(pan,tilt)
 
 
-class TimeLaps(object):
-    def __init__(self, resolution=(2592, 1952), framerate=1, delay=360, 
+class TimeLaps(threading.Thread):
+    def __init__(self, resolution=(3280, 2464), framerate=1, delay=20, 
                  folder=".", avg_awb=200, avg_ev=25, config_file="parameters.json"):
+        threading.Thread.__init__(self, name="TimeLaps")
+        self.storage = {}
         self.camera_queue = Queue()
         self.analysis_queue = Queue()
         self.saving_queue = Queue()
-        self.quit_event = Event()
+        self.quit_event = threading.Event()
         self.delay = delay
         self.folder = os.path.abspath(folder)
         self.avg_wb = avg_awb # time laps over which average gains
         self.avg_ev = avg_ev # time laps over which average speed
         self.config_file = os.path.abspath(config_file)
         self.position = Position(0,0)
-        self.lens = Exposition()
         self.start_time = self.last_img = time.time()
         self.next_img = self.last_img + 2 * self.delay
         signal.signal(signal.SIGINT, self.quit)
         self.accelero = Accelerometer() 
         self.accelero.start()
         self.trajectory = Trajectory(accelero=self.accelero)
+        self.folder = folder
+        
         self.camera = Camera(resolution=resolution,                              
                              queue=self.camera_queue,
                              framerate = framerate,
@@ -174,15 +188,17 @@ class TimeLaps(object):
                              avg_wb=avg_awb, 
                              histo_ev=None, 
                              wb_red=None, 
-                             wb_blue=None 
-                             quit_event=self.quit_event, 
-                             queue=self.processing_queue,
-                             lens = self.lens
+                             wb_blue=None,
+                             quit_event=self.quit_event,
                              )
-        self.load_config() 
-
+        self.load_config(config_file) 
+        self.saver = Saver(folder=self.folder,
+                           queue=self.saving_queue, 
+                           quit_event=self.quit_event)
+        self.saver.start()
+        self.position = self.trajectory.goto(self.delay)  
+        self.camera.warm_up()      
         self.camera.start()
-        self.position = self.trajectory.goto(self.delay)        
     
     def __del__(self):
         self.quit_event.set()
@@ -194,28 +210,56 @@ class TimeLaps(object):
         """called with SIGINT: clean up and quit gracefully"""
         self.quit_event.set()
 
-    def load_config(self):
-        if os.path.isfile(self.config_file):
+    def load_config(self, config_file=None):
+        if config_file is None:
+            config_file=self.config_file
+            
+        if os.path.isfile(config_file):
             with open(self.config_file) as jsonfile:
                 dico = json.load(jsonfile)
+            #print(dico)
             if "trajectory" in dico:
-				self.trjectory = dico["trajectory"] 
+				self.trajectory.set_config(dico["trajectory"]) 
             if "camera" in dico:
                 self.camera.set_config(dico["camera"])
             self.delay = dico.get("delay", self.delay)
+            self.folder = dico.get("folder", self.folder)
             
     def save_config(self):
         camera_config = self.camera.get_config()
         dico = OrderedDict([                           
                             ("delay", self.delay),
+                            ("folder", self.folder),
                             ("trajectory", self.trajectory.config),
                             ("camera", camera_config),
                             ])
         with open(self.config_file,"w") as jsonfile:
             jsonfile.write(json.dumps(dico, indent=4))
 
+    def run(self):
+        "Actually does the timelaps"
+        
+        while not self.quit_event.is_set():
+            frame = self.camera_queue.get()
+            frame.position = self.position
+            if self.position in self.storage:
+                self.storage[self.position].append(frame) 
+            else:
+                self.storage[self.position] = [frame]
+            if time.time() >= tl.next_img:
+                frame.gravity = self.accelero.get()
+                self.saving_queue.put(self.storage.pop(self.position))
+                self.next_img = frame.timestamp + self.delay
+                next_pos = self.trajectory.calc_pos(self.next_img - self.start_time)
+                if next_pos != self.position:
+                    self.trajectory.goto_pos(next_pos)
+                    self.position = next_pos
+            self.camera_queue.task_done()
+
+
     def capture(self):
         """Take a picture with the camera, if there is enough light
+        #unused
         """
         if not self.is_valid:
             print("Skipped, low light Speed %.3f/iso%.0f"%(self.last_speed, self.last_gain))
@@ -248,7 +292,8 @@ class TimeLaps(object):
         self.camera.shutter_speed = 0
         self.position = self.trajectory.goto(self.next_img - self.start_time)
 
-    def measure(self):   
+    def measure(self):
+        "#unused"   
         self.camera.capture(self.raw, 'rgb')
         self.raw.truncate(0)
         r,b = self.camera.awb_gains
@@ -302,17 +347,10 @@ if __name__ == "__main__":
     parser = ArgumentParser("trajlaps", 
                             description="TimeLaps over a trajectory")
     parser.add_argument("-j", "--json", help="config file")
+    parser.add_argument("-d", "--debug", help="debug", default=False, action="store_true")
+    
     args = parser.parse_args()
-    tl = TimeLaps(resolution=(config_file=args.json)
-    print("Warmup ... %s seconds"%(2*tl.delay))
-    while not tl.quit_event.is_set():
-        frame = tl.camera_queue.get()
-        if time.time() < tl.next_img:        
-            tl.analysis_queue.put(frame)
-        else:
-            frame.position = tl.position
-            frame.gravity = tl.accelero.get()
-            tl.saving_queue.put(frame)
-            tl.next_img = frame.timestamp + tl.delay
-            tl.position = tl.trajectory.goto(tl.next_img - tl.start_time)
-        tl.camera_queue.task_done()
+    if args.debug:
+        logging.root.setLevel(logging.DEBUG)
+    tl = TimeLaps(config_file=args.json, framerate=0.1)
+    tl.run()
