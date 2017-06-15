@@ -40,6 +40,10 @@ def yuv420_to_yuv(stream, resolution):
     
 def yuv420_to_rgb(stream, resolution):
     """Convert a YUV420 linear stream into an image RGB
+    array: 
+    [[1.164383  0  1.596027
+     [1.164383 -0.391762 -0.812968
+     [1.164383 2.017232 0 
     
     :param stream: string (bytes) with the stream
     :param resolution: 2-tuple (width, height)
@@ -70,14 +74,18 @@ def yuv420_to_rgb(stream, resolution):
             u = cstream[ylen + l + m]
             v =cstream[ylen + uvlen + l + m]
             histo[0, y] += 1
-            # integer version (*4096)
+            # integer version (*65535)
             y -= 16
-            y *= 4768
+            if y<0: 
+                y=0
+            if y>219:
+                y=219
+            y *= 262144
             u -= 128
             v -= 128
-            r = (y + 6537 * v) >> 12
-            g = (y - 3330 * v - 1606 * u) >> 12
-            b = (y + 8262 * u) >> 12
+            r = (y + 104597 * v) >> 16
+            g = (y - 25675 * v - 53278 * u) >> 16
+            b = (y + 132201 * u) >> 16
             
             # Floating point version
             #yf = 1.164 * <float> y

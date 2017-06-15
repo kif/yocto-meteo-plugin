@@ -122,8 +122,8 @@ class Trajectory(object):
         self.servo_tilt.move(tilt)
         self.servo_pan.move(pan)
         time.sleep(self.delay_off)
-        self.servo_tilt.off()
-        self.servo_pan.off()
+        #self.servo_tilt.off()
+        #self.servo_pan.off()
         self.accelero.resume()
         self.camera.resume()
  
@@ -262,10 +262,13 @@ class TimeLaps(threading.Thread):
                     self.trajectory.goto_pos(next_pos)
                     self.position = next_pos
             self.camera_queue.task_done()
-            logger.info("Length of queues: camera_queue %s, analysis_queue %s saving_queue %s", 
+            logger.info("Frame #%04i. Length of queues: camera %i, analysis %i saving %i config %i", 
+                            frame.index,
                             self.camera_queue.qsize(), 
                             self.analysis_queue.qsize(),
-                            self.saving_queue.qsize())
+                            self.saving_queue.qsize(),
+                            self.config_queue.qsize()
+                            )
                             
 #    def capture(self):
 #        """Take a picture with the camera, if there is enough light

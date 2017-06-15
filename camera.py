@@ -51,7 +51,7 @@ class SavGol(object):
         return numpy.dot(lst, self.cache[l])
 
 
-savgol = SavGol()
+savgol = SavGol(0)
 
 
 class Frame(object):
@@ -330,7 +330,7 @@ class Camera(threading.Thread):
             self._done_recording.set()
             if self.stream.frame is not None:
                 frame = self.stream.frame
-                logger.info("Frame acquired: %s", frame.index)
+                logger.debug("Acquired %s", frame)
                 frame.camera_meta = self.get_metadata()
                 self.queue.put(frame)
             else:
@@ -344,6 +344,7 @@ class Camera(threading.Thread):
                     if evrb.red:
                         self.wb_red.append(evrb.red)
                         self.wb_blue.append(evrb.blue)
+                    self.config_queue.task_done()
             #        self.histo_ev.append(evrb.ev)
                 self.update_expo()    
             self._can_record.wait()
