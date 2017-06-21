@@ -2000,7 +2000,6 @@ static const char __pyx_k_yuv420_to_yuv[] = "yuv420_to_yuv";
 static const char __pyx_k_allocate_buffer[] = "allocate_buffer";
 static const char __pyx_k_dtype_is_object[] = "dtype_is_object";
 static const char __pyx_k_ascontiguousarray[] = "ascontiguousarray";
-static const char __pyx_k_ascontingousarray[] = "ascontingousarray";
 static const char __pyx_k_strided_and_direct[] = "<strided and direct>";
 static const char __pyx_k_stream_is_len_enough[] = "stream is len enough";
 static const char __pyx_k_strided_and_indirect[] = "<strided and indirect>";
@@ -2057,7 +2056,6 @@ static PyObject *__pyx_n_s_ValueError;
 static PyObject *__pyx_n_s_allocate_buffer;
 static PyObject *__pyx_n_s_asarray;
 static PyObject *__pyx_n_s_ascontiguousarray;
-static PyObject *__pyx_n_s_ascontingousarray;
 static PyObject *__pyx_n_s_b;
 static PyObject *__pyx_n_s_base;
 static PyObject *__pyx_n_s_c;
@@ -2076,7 +2074,7 @@ static PyObject *__pyx_n_s_error;
 static PyObject *__pyx_n_s_fheight;
 static PyObject *__pyx_n_s_flags;
 static PyObject *__pyx_n_s_flatfile;
-static PyObject *__pyx_n_u_float32;
+static PyObject *__pyx_n_s_float32;
 static PyObject *__pyx_n_s_format;
 static PyObject *__pyx_n_s_fortran;
 static PyObject *__pyx_n_u_fortran;
@@ -3928,7 +3926,7 @@ static PyObject *__pyx_pf_6colors_2yuv420_to_rgb(CYTHON_UNUSED PyObject *__pyx_s
  * 
  *     def __cinit__(self, flatfile):             # <<<<<<<<<<<<<<
  *         data = numpy.loadtxt(flatfile)
- *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype="float32")
+ *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
  */
 
 /* Python wrapper */
@@ -3988,18 +3986,19 @@ static int __pyx_pf_6colors_9Flatfield___cinit__(struct __pyx_obj_6colors_Flatfi
   PyObject *__pyx_t_2 = NULL;
   PyObject *__pyx_t_3 = NULL;
   PyObject *__pyx_t_4 = NULL;
-  __Pyx_memviewslice __pyx_t_5 = { 0, 0, { 0 }, { 0 }, { 0 } };
-  int __pyx_t_6;
-  Py_ssize_t __pyx_t_7;
+  PyObject *__pyx_t_5 = NULL;
+  __Pyx_memviewslice __pyx_t_6 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  int __pyx_t_7;
   Py_ssize_t __pyx_t_8;
+  Py_ssize_t __pyx_t_9;
   __Pyx_RefNannySetupContext("__cinit__", 0);
 
   /* "colors.pyx":128
  * 
  *     def __cinit__(self, flatfile):
  *         data = numpy.loadtxt(flatfile)             # <<<<<<<<<<<<<<
- *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype="float32")
- *         self.red = numpy.ascontiguousarray(data[:, 1], dtype="float32")
+ *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
+ *         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
  */
   __pyx_t_2 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 128, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
@@ -4055,9 +4054,9 @@ static int __pyx_pf_6colors_9Flatfield___cinit__(struct __pyx_obj_6colors_Flatfi
   /* "colors.pyx":129
  *     def __cinit__(self, flatfile):
  *         data = numpy.loadtxt(flatfile)
- *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype="float32")             # <<<<<<<<<<<<<<
- *         self.red = numpy.ascontiguousarray(data[:, 1], dtype="float32")
- *         self.green = numpy.ascontiguousarray(data[:, 2], dtype="float32")
+ *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)             # <<<<<<<<<<<<<<
+ *         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
+ *         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
  */
   __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 129, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -4073,150 +4072,174 @@ static int __pyx_pf_6colors_9Flatfield___cinit__(struct __pyx_obj_6colors_Flatfi
   __pyx_t_1 = 0;
   __pyx_t_1 = PyDict_New(); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 129, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_n_u_float32) < 0) __PYX_ERR(0, 129, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyObject_Call(__pyx_t_3, __pyx_t_4, __pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 129, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 129, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_float32); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 129, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_5) < 0) __PYX_ERR(0, 129, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_3, __pyx_t_4, __pyx_t_1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 129, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_dc_float(__pyx_t_2);
-  if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 129, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_dc_float(__pyx_t_5);
+  if (unlikely(!__pyx_t_6.memview)) __PYX_ERR(0, 129, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __PYX_XDEC_MEMVIEW(&__pyx_v_self->radius, 0);
-  __pyx_v_self->radius = __pyx_t_5;
-  __pyx_t_5.memview = NULL;
-  __pyx_t_5.data = NULL;
+  __pyx_v_self->radius = __pyx_t_6;
+  __pyx_t_6.memview = NULL;
+  __pyx_t_6.data = NULL;
 
   /* "colors.pyx":130
  *         data = numpy.loadtxt(flatfile)
- *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype="float32")
- *         self.red = numpy.ascontiguousarray(data[:, 1], dtype="float32")             # <<<<<<<<<<<<<<
- *         self.green = numpy.ascontiguousarray(data[:, 2], dtype="float32")
- *         self.blue = numpy.ascontingousarray(data[:, 3], dtype="float32")
+ *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
+ *         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)             # <<<<<<<<<<<<<<
+ *         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
+ *         self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)
  */
-  __pyx_t_2 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 130, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 130, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = PyObject_GetItem(__pyx_v_data, __pyx_tuple__7); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 130, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_5 = PyObject_GetItem(__pyx_v_data, __pyx_tuple__7); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
   __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_GIVEREF(__pyx_t_5);
+  PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_5);
+  __pyx_t_5 = 0;
+  __pyx_t_5 = PyDict_New(); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_3 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_float32); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  if (PyDict_SetItem(__pyx_t_5, __pyx_n_s_dtype, __pyx_t_2) < 0) __PYX_ERR(0, 130, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_4, __pyx_t_5); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_dc_float(__pyx_t_2);
+  if (unlikely(!__pyx_t_6.memview)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __PYX_XDEC_MEMVIEW(&__pyx_v_self->red, 0);
+  __pyx_v_self->red = __pyx_t_6;
+  __pyx_t_6.memview = NULL;
+  __pyx_t_6.data = NULL;
+
+  /* "colors.pyx":131
+ *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
+ *         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
+ *         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)             # <<<<<<<<<<<<<<
+ *         self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)
+ *         self.size = data.shape[0]
+ */
+  __pyx_t_2 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = PyObject_GetItem(__pyx_v_data, __pyx_tuple__9); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 131, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_GIVEREF(__pyx_t_2);
   PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_2);
   __pyx_t_2 = 0;
-  __pyx_t_2 = PyDict_New(); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __pyx_t_2 = PyDict_New(); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 131, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_dtype, __pyx_n_u_float32) < 0) __PYX_ERR(0, 130, __pyx_L1_error)
-  __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_4, __pyx_t_2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_float32); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 131, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_dtype, __pyx_t_3) < 0) __PYX_ERR(0, 131, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_5, __pyx_t_4, __pyx_t_2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_dc_float(__pyx_t_3);
-  if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_dc_float(__pyx_t_3);
+  if (unlikely(!__pyx_t_6.memview)) __PYX_ERR(0, 131, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __PYX_XDEC_MEMVIEW(&__pyx_v_self->red, 0);
-  __pyx_v_self->red = __pyx_t_5;
-  __pyx_t_5.memview = NULL;
-  __pyx_t_5.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_v_self->green, 0);
+  __pyx_v_self->green = __pyx_t_6;
+  __pyx_t_6.memview = NULL;
+  __pyx_t_6.data = NULL;
 
-  /* "colors.pyx":131
- *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype="float32")
- *         self.red = numpy.ascontiguousarray(data[:, 1], dtype="float32")
- *         self.green = numpy.ascontiguousarray(data[:, 2], dtype="float32")             # <<<<<<<<<<<<<<
- *         self.blue = numpy.ascontingousarray(data[:, 3], dtype="float32")
+  /* "colors.pyx":132
+ *         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
+ *         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
+ *         self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)             # <<<<<<<<<<<<<<
  *         self.size = data.shape[0]
+ *         self.rmin = self.radius[0]
  */
-  __pyx_t_3 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 132, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 132, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = PyObject_GetItem(__pyx_v_data, __pyx_tuple__9); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __pyx_t_3 = PyObject_GetItem(__pyx_v_data, __pyx_tuple__11); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 132, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 132, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_GIVEREF(__pyx_t_3);
   PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_3);
   __pyx_t_3 = 0;
-  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 132, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_n_u_float32) < 0) __PYX_ERR(0, 131, __pyx_L1_error)
-  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_4, __pyx_t_3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_float32); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_1) < 0) __PYX_ERR(0, 132, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_4, __pyx_t_3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 132, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_dc_float(__pyx_t_1);
-  if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 131, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_dc_float(__pyx_t_1);
+  if (unlikely(!__pyx_t_6.memview)) __PYX_ERR(0, 132, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __PYX_XDEC_MEMVIEW(&__pyx_v_self->green, 0);
-  __pyx_v_self->green = __pyx_t_5;
-  __pyx_t_5.memview = NULL;
-  __pyx_t_5.data = NULL;
-
-  /* "colors.pyx":132
- *         self.red = numpy.ascontiguousarray(data[:, 1], dtype="float32")
- *         self.green = numpy.ascontiguousarray(data[:, 2], dtype="float32")
- *         self.blue = numpy.ascontingousarray(data[:, 3], dtype="float32")             # <<<<<<<<<<<<<<
- *         self.size = data.shape[0]
- *         self.rmin = self.radius[0]
- */
-  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 132, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_ascontingousarray); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 132, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = PyObject_GetItem(__pyx_v_data, __pyx_tuple__11); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 132, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 132, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_4);
-  __Pyx_GIVEREF(__pyx_t_1);
-  PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_1);
-  __pyx_t_1 = 0;
-  __pyx_t_1 = PyDict_New(); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 132, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_n_u_float32) < 0) __PYX_ERR(0, 132, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyObject_Call(__pyx_t_3, __pyx_t_4, __pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 132, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_dc_float(__pyx_t_2);
-  if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 132, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __PYX_XDEC_MEMVIEW(&__pyx_v_self->blue, 0);
-  __pyx_v_self->blue = __pyx_t_5;
-  __pyx_t_5.memview = NULL;
-  __pyx_t_5.data = NULL;
+  __pyx_v_self->blue = __pyx_t_6;
+  __pyx_t_6.memview = NULL;
+  __pyx_t_6.data = NULL;
 
   /* "colors.pyx":133
- *         self.green = numpy.ascontiguousarray(data[:, 2], dtype="float32")
- *         self.blue = numpy.ascontingousarray(data[:, 3], dtype="float32")
+ *         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
+ *         self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)
  *         self.size = data.shape[0]             # <<<<<<<<<<<<<<
  *         self.rmin = self.radius[0]
  *         self.rmax = self.radius[self.size - 1]
  */
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_v_data, __pyx_n_s_shape); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 133, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_1 = __Pyx_GetItemInt(__pyx_t_2, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 133, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_data, __pyx_n_s_shape); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_6 = __Pyx_PyInt_As_int(__pyx_t_1); if (unlikely((__pyx_t_6 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 133, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_GetItemInt(__pyx_t_1, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 133, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_v_self->size = __pyx_t_6;
+  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_3); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 133, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_v_self->size = __pyx_t_7;
 
   /* "colors.pyx":134
- *         self.blue = numpy.ascontingousarray(data[:, 3], dtype="float32")
+ *         self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)
  *         self.size = data.shape[0]
  *         self.rmin = self.radius[0]             # <<<<<<<<<<<<<<
  *         self.rmax = self.radius[self.size - 1]
  *         self.dr = (self.rmax - self.rmin) / (self.size - 1)
  */
-  __pyx_t_7 = 0;
-  __pyx_v_self->rmin = (*((float *) ( /* dim=0 */ ((char *) (((float *) __pyx_v_self->radius.data) + __pyx_t_7)) )));
+  __pyx_t_8 = 0;
+  __pyx_v_self->rmin = (*((float *) ( /* dim=0 */ ((char *) (((float *) __pyx_v_self->radius.data) + __pyx_t_8)) )));
 
   /* "colors.pyx":135
  *         self.size = data.shape[0]
@@ -4225,8 +4248,8 @@ static int __pyx_pf_6colors_9Flatfield___cinit__(struct __pyx_obj_6colors_Flatfi
  *         self.dr = (self.rmax - self.rmin) / (self.size - 1)
  * 
  */
-  __pyx_t_8 = (__pyx_v_self->size - 1);
-  __pyx_v_self->rmax = (*((float *) ( /* dim=0 */ ((char *) (((float *) __pyx_v_self->radius.data) + __pyx_t_8)) )));
+  __pyx_t_9 = (__pyx_v_self->size - 1);
+  __pyx_v_self->rmax = (*((float *) ( /* dim=0 */ ((char *) (((float *) __pyx_v_self->radius.data) + __pyx_t_9)) )));
 
   /* "colors.pyx":136
  *         self.rmin = self.radius[0]
@@ -4242,7 +4265,7 @@ static int __pyx_pf_6colors_9Flatfield___cinit__(struct __pyx_obj_6colors_Flatfi
  * 
  *     def __cinit__(self, flatfile):             # <<<<<<<<<<<<<<
  *         data = numpy.loadtxt(flatfile)
- *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype="float32")
+ *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
  */
 
   /* function exit code */
@@ -4253,7 +4276,8 @@ static int __pyx_pf_6colors_9Flatfield___cinit__(struct __pyx_obj_6colors_Flatfi
   __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4);
-  __PYX_XDEC_MEMVIEW(&__pyx_t_5, 1);
+  __Pyx_XDECREF(__pyx_t_5);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_6, 1);
   __Pyx_AddTraceback("colors.Flatfield.__cinit__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = -1;
   __pyx_L0:;
@@ -20772,7 +20796,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_allocate_buffer, __pyx_k_allocate_buffer, sizeof(__pyx_k_allocate_buffer), 0, 0, 1, 1},
   {&__pyx_n_s_asarray, __pyx_k_asarray, sizeof(__pyx_k_asarray), 0, 0, 1, 1},
   {&__pyx_n_s_ascontiguousarray, __pyx_k_ascontiguousarray, sizeof(__pyx_k_ascontiguousarray), 0, 0, 1, 1},
-  {&__pyx_n_s_ascontingousarray, __pyx_k_ascontingousarray, sizeof(__pyx_k_ascontingousarray), 0, 0, 1, 1},
   {&__pyx_n_s_b, __pyx_k_b, sizeof(__pyx_k_b), 0, 0, 1, 1},
   {&__pyx_n_s_base, __pyx_k_base, sizeof(__pyx_k_base), 0, 0, 1, 1},
   {&__pyx_n_s_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 0, 1, 1},
@@ -20791,7 +20814,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_fheight, __pyx_k_fheight, sizeof(__pyx_k_fheight), 0, 0, 1, 1},
   {&__pyx_n_s_flags, __pyx_k_flags, sizeof(__pyx_k_flags), 0, 0, 1, 1},
   {&__pyx_n_s_flatfile, __pyx_k_flatfile, sizeof(__pyx_k_flatfile), 0, 0, 1, 1},
-  {&__pyx_n_u_float32, __pyx_k_float32, sizeof(__pyx_k_float32), 0, 1, 0, 1},
+  {&__pyx_n_s_float32, __pyx_k_float32, sizeof(__pyx_k_float32), 0, 0, 1, 1},
   {&__pyx_n_s_format, __pyx_k_format, sizeof(__pyx_k_format), 0, 0, 1, 1},
   {&__pyx_n_s_fortran, __pyx_k_fortran, sizeof(__pyx_k_fortran), 0, 0, 1, 1},
   {&__pyx_n_u_fortran, __pyx_k_fortran, sizeof(__pyx_k_fortran), 0, 1, 0, 1},
@@ -20909,9 +20932,9 @@ static int __Pyx_InitCachedConstants(void) {
   /* "colors.pyx":129
  *     def __cinit__(self, flatfile):
  *         data = numpy.loadtxt(flatfile)
- *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype="float32")             # <<<<<<<<<<<<<<
- *         self.red = numpy.ascontiguousarray(data[:, 1], dtype="float32")
- *         self.green = numpy.ascontiguousarray(data[:, 2], dtype="float32")
+ *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)             # <<<<<<<<<<<<<<
+ *         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
+ *         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
  */
   __pyx_slice__4 = PySlice_New(Py_None, Py_None, Py_None); if (unlikely(!__pyx_slice__4)) __PYX_ERR(0, 129, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_slice__4);
@@ -20922,10 +20945,10 @@ static int __Pyx_InitCachedConstants(void) {
 
   /* "colors.pyx":130
  *         data = numpy.loadtxt(flatfile)
- *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype="float32")
- *         self.red = numpy.ascontiguousarray(data[:, 1], dtype="float32")             # <<<<<<<<<<<<<<
- *         self.green = numpy.ascontiguousarray(data[:, 2], dtype="float32")
- *         self.blue = numpy.ascontingousarray(data[:, 3], dtype="float32")
+ *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
+ *         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)             # <<<<<<<<<<<<<<
+ *         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
+ *         self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)
  */
   __pyx_slice__6 = PySlice_New(Py_None, Py_None, Py_None); if (unlikely(!__pyx_slice__6)) __PYX_ERR(0, 130, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_slice__6);
@@ -20935,10 +20958,10 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__7);
 
   /* "colors.pyx":131
- *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype="float32")
- *         self.red = numpy.ascontiguousarray(data[:, 1], dtype="float32")
- *         self.green = numpy.ascontiguousarray(data[:, 2], dtype="float32")             # <<<<<<<<<<<<<<
- *         self.blue = numpy.ascontingousarray(data[:, 3], dtype="float32")
+ *         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
+ *         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
+ *         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)             # <<<<<<<<<<<<<<
+ *         self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)
  *         self.size = data.shape[0]
  */
   __pyx_slice__8 = PySlice_New(Py_None, Py_None, Py_None); if (unlikely(!__pyx_slice__8)) __PYX_ERR(0, 131, __pyx_L1_error)
@@ -20949,9 +20972,9 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__9);
 
   /* "colors.pyx":132
- *         self.red = numpy.ascontiguousarray(data[:, 1], dtype="float32")
- *         self.green = numpy.ascontiguousarray(data[:, 2], dtype="float32")
- *         self.blue = numpy.ascontingousarray(data[:, 3], dtype="float32")             # <<<<<<<<<<<<<<
+ *         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
+ *         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
+ *         self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)             # <<<<<<<<<<<<<<
  *         self.size = data.shape[0]
  *         self.rmin = self.radius[0]
  */

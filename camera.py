@@ -391,6 +391,7 @@ class Saver(threading.Thread):
         self.quit_event = quit_event or threading.Signal()
         self.folder = os.path.abspath(folder)
         if not os.path.exists(self.folder):
+            logger.warning("Creating folder %s", self.folder)
             os.makedirs(self.folder)
 
     def run(self):

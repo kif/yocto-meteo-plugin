@@ -129,7 +129,7 @@ cdef class Flatfield:
         self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
         self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
         self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
-        self.blue = numpy.ascontingousarray(data[:, 3], dtype=numpy.float32)
+        self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)
         self.size = data.shape[0]
         self.rmin = self.radius[0]
         self.rmax = self.radius[self.size - 1]
