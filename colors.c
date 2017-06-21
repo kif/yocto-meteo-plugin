@@ -2147,6 +2147,7 @@ static PyObject *__pyx_pf_6colors_2yuv420_to_rgb(CYTHON_UNUSED PyObject *__pyx_s
 static int __pyx_pf_6colors_9Flatfield___cinit__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self, PyObject *__pyx_v_flatfile); /* proto */
 static void __pyx_pf_6colors_9Flatfield_2__dealloc__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_6colors_9Flatfield_4yuv420_to_rgb(struct __pyx_obj_6colors_Flatfield *__pyx_v_self, PyObject *__pyx_v_stream, PyObject *__pyx_v_resolution); /* proto */
+static PyObject *__pyx_pf_6colors_9Flatfield_6yuv420_to_yuv(CYTHON_UNUSED struct __pyx_obj_6colors_Flatfield *__pyx_v_self, PyObject *__pyx_v_stream, PyObject *__pyx_v_resolution); /* proto */
 static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __pyx_array_obj *__pyx_v_self, PyObject *__pyx_v_shape, Py_ssize_t __pyx_v_itemsize, PyObject *__pyx_v_format, PyObject *__pyx_v_mode, int __pyx_v_allocate_buffer); /* proto */
@@ -5654,6 +5655,8 @@ static PyObject *__pyx_pf_6colors_9Flatfield_4yuv420_to_rgb(struct __pyx_obj_6co
  *                 histo[3, b] += 1
  * 
  *         return numpy.asarray(rgb), numpy.asarray(histo)             # <<<<<<<<<<<<<<
+ * 
+ *     def yuv420_to_yuv(self, stream, resolution):
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_6 = __Pyx_GetModuleGlobalName(__pyx_n_s_numpy); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 259, __pyx_L1_error)
@@ -5799,6 +5802,159 @@ static PyObject *__pyx_pf_6colors_9Flatfield_4yuv420_to_rgb(struct __pyx_obj_6co
   __PYX_XDEC_MEMVIEW(&__pyx_v_cstream, 1);
   __PYX_XDEC_MEMVIEW(&__pyx_v_rgb, 1);
   __PYX_XDEC_MEMVIEW(&__pyx_v_histo, 1);
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "colors.pyx":261
+ *         return numpy.asarray(rgb), numpy.asarray(histo)
+ * 
+ *     def yuv420_to_yuv(self, stream, resolution):             # <<<<<<<<<<<<<<
+ *         return yuv420_to_yuv(stream, resolution)
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_6colors_9Flatfield_7yuv420_to_yuv(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_6colors_9Flatfield_7yuv420_to_yuv(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  PyObject *__pyx_v_stream = 0;
+  PyObject *__pyx_v_resolution = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("yuv420_to_yuv (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_stream,&__pyx_n_s_resolution,0};
+    PyObject* values[2] = {0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_stream)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        case  1:
+        if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_resolution)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("yuv420_to_yuv", 1, 2, 2, 1); __PYX_ERR(0, 261, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "yuv420_to_yuv") < 0)) __PYX_ERR(0, 261, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+    }
+    __pyx_v_stream = values[0];
+    __pyx_v_resolution = values[1];
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("yuv420_to_yuv", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 261, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("colors.Flatfield.yuv420_to_yuv", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_6colors_9Flatfield_6yuv420_to_yuv(((struct __pyx_obj_6colors_Flatfield *)__pyx_v_self), __pyx_v_stream, __pyx_v_resolution);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_6colors_9Flatfield_6yuv420_to_yuv(CYTHON_UNUSED struct __pyx_obj_6colors_Flatfield *__pyx_v_self, PyObject *__pyx_v_stream, PyObject *__pyx_v_resolution) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_3 = NULL;
+  int __pyx_t_4;
+  PyObject *__pyx_t_5 = NULL;
+  __Pyx_RefNannySetupContext("yuv420_to_yuv", 0);
+
+  /* "colors.pyx":262
+ * 
+ *     def yuv420_to_yuv(self, stream, resolution):
+ *         return yuv420_to_yuv(stream, resolution)             # <<<<<<<<<<<<<<
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_2 = __Pyx_GetModuleGlobalName(__pyx_n_s_yuv420_to_yuv); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 262, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_3 = NULL;
+  __pyx_t_4 = 0;
+  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_2))) {
+    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_2);
+    if (likely(__pyx_t_3)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_2);
+      __Pyx_INCREF(__pyx_t_3);
+      __Pyx_INCREF(function);
+      __Pyx_DECREF_SET(__pyx_t_2, function);
+      __pyx_t_4 = 1;
+    }
+  }
+  #if CYTHON_FAST_PYCALL
+  if (PyFunction_Check(__pyx_t_2)) {
+    PyObject *__pyx_temp[3] = {__pyx_t_3, __pyx_v_stream, __pyx_v_resolution};
+    __pyx_t_1 = __Pyx_PyFunction_FastCall(__pyx_t_2, __pyx_temp+1-__pyx_t_4, 2+__pyx_t_4); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 262, __pyx_L1_error)
+    __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+    __Pyx_GOTREF(__pyx_t_1);
+  } else
+  #endif
+  #if CYTHON_FAST_PYCCALL
+  if (__Pyx_PyFastCFunction_Check(__pyx_t_2)) {
+    PyObject *__pyx_temp[3] = {__pyx_t_3, __pyx_v_stream, __pyx_v_resolution};
+    __pyx_t_1 = __Pyx_PyCFunction_FastCall(__pyx_t_2, __pyx_temp+1-__pyx_t_4, 2+__pyx_t_4); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 262, __pyx_L1_error)
+    __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+    __Pyx_GOTREF(__pyx_t_1);
+  } else
+  #endif
+  {
+    __pyx_t_5 = PyTuple_New(2+__pyx_t_4); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 262, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    if (__pyx_t_3) {
+      __Pyx_GIVEREF(__pyx_t_3); PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_3); __pyx_t_3 = NULL;
+    }
+    __Pyx_INCREF(__pyx_v_stream);
+    __Pyx_GIVEREF(__pyx_v_stream);
+    PyTuple_SET_ITEM(__pyx_t_5, 0+__pyx_t_4, __pyx_v_stream);
+    __Pyx_INCREF(__pyx_v_resolution);
+    __Pyx_GIVEREF(__pyx_v_resolution);
+    PyTuple_SET_ITEM(__pyx_t_5, 1+__pyx_t_4, __pyx_v_resolution);
+    __pyx_t_1 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_5, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 262, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  }
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "colors.pyx":261
+ *         return numpy.asarray(rgb), numpy.asarray(histo)
+ * 
+ *     def yuv420_to_yuv(self, stream, resolution):             # <<<<<<<<<<<<<<
+ *         return yuv420_to_yuv(stream, resolution)
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_5);
+  __Pyx_AddTraceback("colors.Flatfield.yuv420_to_yuv", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
@@ -20023,6 +20179,7 @@ static void __pyx_tp_dealloc_6colors_Flatfield(PyObject *o) {
 
 static PyMethodDef __pyx_methods_6colors_Flatfield[] = {
   {"yuv420_to_rgb", (PyCFunction)__pyx_pw_6colors_9Flatfield_5yuv420_to_rgb, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6colors_9Flatfield_4yuv420_to_rgb},
+  {"yuv420_to_yuv", (PyCFunction)__pyx_pw_6colors_9Flatfield_7yuv420_to_yuv, METH_VARARGS|METH_KEYWORDS, 0},
   {0, 0, 0, 0}
 };
 

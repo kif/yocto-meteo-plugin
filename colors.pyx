@@ -257,3 +257,6 @@ cdef class Flatfield:
                 histo[3, b] += 1
                 
         return numpy.asarray(rgb), numpy.asarray(histo)
+
+    def yuv420_to_yuv(self, stream, resolution):
+        return yuv420_to_yuv(stream, resolution)
