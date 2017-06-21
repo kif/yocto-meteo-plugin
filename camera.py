@@ -21,11 +21,12 @@ from exposure import lens
 logger = logging.getLogger("camera")
 import signal
 try:
-    import colors
+    import colors as _colors
 except ImportError:
     logger.warning("Colors module not available, using slow Python implementation")
     colors = None
-
+else:
+    colors = _colors.Flatfield("flatfield.txt")
 ExpoRedBlue = namedtuple("ExpoRedBlue", ("ev", "dev", "over", "red", "green", "blue"))
 GainRedBlue = namedtuple("GainRedBlue", ("red", "blue"))
 
@@ -431,7 +432,7 @@ class Saver(threading.Thread):
                 exif.comment = json.dumps(comments)
                 exif.write(preserve_timestamps=True)
             self.queue.task_done()
-            logger.debug("Saving of frame #%i took %.3fs", frame.index, time.time() - t0)
+            logger.info("Saving of frame #%i took %.3fs", frame.index, time.time() - t0)
 
 
 class Analyzer(threading.Thread):
