@@ -27,16 +27,17 @@ def yuv420_to_yuv(stream, resolution):
     uvlen = ylen // 4
     assert cstream.size >= (ylen + 2 * uvlen), "stream is len enough"
     yuv = numpy.empty((height, width, 3), dtype=numpy.uint8)
-    for i in range(height):
-        k = fwidth * i
-        l = (fwidth // 2) * (i // 2)
-        for j in range(width):
-            m = j // 2
-            y = cstream[k + j]
-            yuv[i, j, 0] = y
-            yuv[i, j, 1] = cstream[ylen + l + m]
-            yuv[i, j, 2] = cstream[ylen + uvlen + l + m]
-            histo[y] += 1
+    with nogil:
+        for i in range(height):
+            k = fwidth * i
+            l = (fwidth // 2) * (i // 2)
+            for j in range(width):
+                m = j // 2
+                y = cstream[k + j]
+                yuv[i, j, 0] = y
+                yuv[i, j, 1] = cstream[ylen + l + m]
+                yuv[i, j, 2] = cstream[ylen + uvlen + l + m]
+                histo[y] += 1
     return numpy.asarray(yuv), numpy.asarray(histo)
     
 def yuv420_to_rgb(stream, resolution):
@@ -66,61 +67,121 @@ def yuv420_to_rgb(stream, resolution):
     uvlen = ylen // 4
     assert cstream.size >= (ylen + 2 * uvlen), "stream is len enough"
     rgb = numpy.empty((height, width, 3), dtype=numpy.uint8)
-    for i in range(height):
-        k = fwidth * i
-        l = (fwidth // 2) * (i // 2)
-        for j in range(width):
-            m = j // 2
-            y = cstream[k + j]
-            u = cstream[ylen + l + m]
-            v =cstream[ylen + uvlen + l + m]
-            histo[0, y] += 1
-            # integer version (*65535)
-            y -= 16
-            if y<0: 
-                y=0
-            if y>219:
-                y=219
-            y *= 262144
-            u -= 128
-            v -= 128
-            r = (y + 104597 * v) >> 16
-            g = (y - 25675 * v - 53278 * u) >> 16
-            b = (y + 132201 * u) >> 16
-            
-            # Floating point version
-            #yf = 1.164 * <float> y
-            #uf = <float> u
-            #vf = <float> v
-            #r = <numpy.uint8_t> (yf + 1.596 * vf)
-            #g = <numpy.uint8_t> (yf - 0.813 * vf - 0.392 * uf)
-            #b = <numpy.uint8_t> (yf + 2.017 * uf)
-            
-            if r < 0:
-                r = 0
-            elif r > 255:
-                r = 255
-            if b < 0:
-                b = 0
-            elif b > 255:
-                b = 255
-            if g < 0:
-                g = 0
-            elif g > 255:
-                g = 255
-            
-            rgb[i, j, 0] = r
-            rgb[i, j, 1] = g
-            rgb[i, j, 2] = b
-            histo[1, r] += 1
-            histo[2, g] += 1
-            histo[3, b] += 1
+    with nogil:
+        for i in range(height):
+            k = fwidth * i
+            l = (fwidth // 2) * (i // 2)
+            for j in range(width):
+                m = j // 2
+                y = cstream[k + j]
+                u = cstream[ylen + l + m]
+                v =cstream[ylen + uvlen + l + m]
+                histo[0, y] += 1
+                # integer version (*65535)
+                y -= 16
+                if y<0: 
+                    y=0
+                if y>219:
+                    y=219
+                y *= 262144
+                u -= 128
+                v -= 128
+                r = (y + 104597 * v) >> 16
+                g = (y - 25675 * v - 53278 * u) >> 16
+                b = (y + 132201 * u) >> 16
+                
+                # Floating point version
+                #yf = 1.164 * <float> y
+                #uf = <float> u
+                #vf = <float> v
+                #r = <numpy.uint8_t> (yf + 1.596 * vf)
+                #g = <numpy.uint8_t> (yf - 0.813 * vf - 0.392 * uf)
+                #b = <numpy.uint8_t> (yf + 2.017 * uf)
+                
+                if r < 0:
+                    r = 0
+                elif r > 255:
+                    r = 255
+                if b < 0:
+                    b = 0
+                elif b > 255:
+                    b = 255
+                if g < 0:
+                    g = 0
+                elif g > 255:
+                    g = 255
+                
+                rgb[i, j, 0] = r
+                rgb[i, j, 1] = g
+                rgb[i, j, 2] = b
+                histo[1, r] += 1
+                histo[2, g] += 1
+                histo[3, b] += 1
             
     return numpy.asarray(rgb), numpy.asarray(histo)
 
+
+cdef class SRGB:
+    """Compress an image in sRGB space
+    https://en.wikipedia.org/wiki/SRGB
+    
+    gamma: 2.4 offset: 0.055, slope:12.92
+    """
+    cdef:
+        readonly numpy.uint8_t[::1] LUT
+    def __cinit__(self):
+        cdef:
+            float c, a=0.055, res
+            int i 
+        self.LUT = numpy.empty(1<<16, dtype=numpy.uint8)
+        for i in range(1<<16):
+            c = i/65535
+            if c < 0.0031308:
+                self.LUT[i] = <int>(12.92 * c *255 + 0.5)
+            else:
+                self.LUT[i] = <int>(((1+a)*c**(1/2.4) - a) * 255 + 0.5)
+            
+    def __dealloc__(self):
+        self.LUT = None
+    
+    def compress(self, numpy.uint16_t[:, ::1] inp):
+        """Compress a RGB16 linear into a sRGB8 image"""
+        cdef: 
+            int width, height, i, j
+            numpy.uint8_t[:, ::1] outp
+        
+        height = inp.shape[0]
+        width = inp.shape[1]
+        out = numpy.empty((height, width), dtype=numpy.uint8)
+        for i in range(height):
+            for j in range(width):
+                out[i, j] = self.LUT[inp[i,j]]
+        return numpy.asarray(out)
+
+    def sum(numpy.uint16_t[:, ::1] im1, numpy.uint16_t[:, ::1] im2):
+        "sum two images and flag if overflow"
+        cdef: 
+            bint overflow = False
+            int width, height, i, j, r
+            numpy.uint16_t[:, ::1] outp
+        
+        height = im1.shape[0]
+        width = im1.shape[1]
+        out = numpy.empty((height, width), dtype=numpy.uint16)
+        for i in range(height):
+            for j in range(width):
+                r = im1[i,j] + im2[i,j]
+                if r > 65535: 
+                    overflow=True
+                    out[i, j] = 65535
+                else:
+                    out[i, j] = r
+        return numpy.asarray(out), overflow
+        
 cdef class Flatfield:
     cdef: 
         float[::1] radius, red, green, blue
+        numpy.uint16_t[::1] LUT
         float rmin, rmax, dr
         int size
         
@@ -134,6 +195,18 @@ cdef class Flatfield:
         self.rmin = self.radius[0]
         self.rmax = self.radius[self.size - 1]
         self.dr = (self.rmax - self.rmin) / (self.size - 1)
+        
+        cdef:
+            #rg/4.5 if rg<=0.081 else ((rg+0.099)/1.099)**(gamma)
+            float c, a=0.099, res, slope=4.5, gamma=1.0/0.45
+            int i 
+        self.LUT = numpy.empty(1<<16, dtype=numpy.uint16)
+        for i in range(1<<16):
+            c = i/65535.
+            if c < 0.081:
+                self.LUT[i] = <int>((i/slope) + 0.5)
+            else:
+                self.LUT[i] = <int>(65535 * ((c+a)/(1+a))**(gamma) + 0.5)
     
     def __dealloc__(self):
         self.radius = None
@@ -158,18 +231,18 @@ cdef class Flatfield:
             float rd, cr, cg, cb, position, fp, cp, delta_hi, delta_low, rf, gf,bf
             float yf, uf, vf, ys, rv, gu, gv, bu, rg, gg, bg, gamma
             numpy.uint8_t[::1] cstream = numpy.fromstring(stream, numpy.uint8)
-            numpy.uint8_t[:,:,::1] rgb
+            numpy.uint16_t[:,:,::1] rgb
             int[:, ::1] histo
         
-        histo = numpy.zeros((4,256), dtype=numpy.int32)
+        histo = numpy.zeros((4, 256), dtype=numpy.int32)
         
         #Coef for Y'UV -> R'G'B'
-        ys = 255.0/(235-16) #1.164
-        rv = 1.596
-        gu = -0.392
-        gv = -0.813
-        bu = 2.017
-        gamma = 1/0.45
+        ys = 65535 / (235-16) #1.164
+        rv = 65535 * 1.596 / 255
+        gu = -0.392 * 65535 / 255
+        gv = -0.813 * 65535 / 255
+        bu = 2.017 * 65535 / 255
+        #gamma = 1/0.45
         
         width, height = resolution
         half_width = width //2
@@ -179,82 +252,97 @@ cdef class Flatfield:
         ylen = fwidth * fheight
         uvlen = ylen // 4
         assert cstream.size >= (ylen + 2 * uvlen), "stream is len enough"
-        rgb = numpy.empty((height, width, 3), dtype=numpy.uint8)
-        for i in range(height):
-            k = fwidth * i
-            l = (fwidth // 2) * (i // 2)
-            for j in range(width):
-                m = j // 2
-                y = cstream[k + j]
-                u = cstream[ylen + l + m]
-                v =cstream[ylen + uvlen + l + m]
-                histo[0, y] += 1
-                y -= 16
-                if y<0: 
-                    y=0
-                if y>219:
-                    y=219
-                u -= 128
-                v -= 128
-                
-                yf = y * ys
-                rg = (yf + rv * v) / 255.0
-                gg = (yf + gv * v + gu * u) / 255.0
-                bg = (yf + bu * u) / 255.0
-                
-                rg = 0.0 if rg<0.0 else (1.0 if rg>1.0 else rg)
-                gg = 0.0 if gg<0.0 else (1.0 if gg>1.0 else gg)
-                bg = 0.0 if bg<0.0 else (1.0 if bg>1.0 else bg)
-                
-                #Conversion to linear scale
-                rf = rg/4.5 if rg<=0.081 else ((rg+0.099)/1.099)**(gamma)
-                gf = gg/4.5 if gg<=0.081 else ((gg+0.099)/1.099)**(gamma)
-                bf = bg/4.5 if bg<=0.081 else ((bg+0.099)/1.099)**(gamma)
-                
-                #Flatfield correction
-                rd = sqrt(<float>((i-half_height)**2 + (j-half_width)**2))
-                if rd <= self.rmin:
-                    rf *= self.red[0]
-                    gf *= self.green[0] 
-                    bf *= self.blue[0] 
-                elif rd >= self.rmax:
-                    rf *= self.red[self.size - 1]
-                    gf *= self.green[self.size - 1] 
-                    bf *= self.blue[self.size - 1] 
-                else:
-                    position = (rd - self.rmin) / self.dr
-                    cp = ceil(position)
-                    fp = floor(position)
-                    if cp == fp:
-                        rf *= self.red[<int>cp]
-                        gf *= self.green[<int>cp] 
-                        bf *= self.blue[<int>cp] 
-                    else: #Bilinear interpolation
-                        delta_low = position - fp
-                        delta_hi = cp - position
-                        rf *= self.red[<int>fp]*delta_hi + self.red[<int>cp]*delta_low
-                        gf *= self.green[<int>fp]*delta_hi + self.green[<int>cp]*delta_low
-                        bf *= self.blue[<int>fp]*delta_hi + self.blue[<int>cp]*delta_low
-                #Conversion to gamma scale
-                rg = rf*4.5 if rf<=0.018 else (rf**0.45)*1.099 - 0.099
-                gg = gf*4.5 if gf<=0.018 else (gf**0.45)*1.099 - 0.099
-                bg = bf*4.5 if bf<=0.018 else (bf**0.45)*1.099 - 0.099
-                
-                #Normalization
-                rg = 0.0 if rg<0.0 else (1.0 if rg>1.0 else rg)
-                gg = 0.0 if gg<0.0 else (1.0 if gg>1.0 else gg)
-                bg = 0.0 if bg<0.0 else (1.0 if bg>1.0 else bg)
+        rgb = numpy.empty((height, width, 3), dtype=numpy.uint16)
+        with nogil:
+            for i in range(height):
+                k = fwidth * i
+                l = (fwidth // 2) * (i // 2)
+                for j in range(width):
+                    m = j // 2
+                    y = cstream[k + j]
+                    u = cstream[ylen + l + m]
+                    v =cstream[ylen + uvlen + l + m]
+                    histo[0, y] += 1
+                    y -= 16
+                    if y<0: 
+                        y=0
+                    if y>219:
+                        y=219
+                    u -= 128
+                    v -= 128
+                    
+                    yf = y * ys 
+                    r = <int> ((yf + rv * v) +0.5)
+                    g = <int> ((yf + gv * v + gu * u) +0.5)
+                    b = <int> ((yf + bu * u) +0.5)
+                    
+                    #rg = 0.0 if rg<0.0 else (1.0 if rg>1.0 else rg)
+                    #gg = 0.0 if gg<0.0 else (1.0 if gg>1.0 else gg)
+                    #bg = 0.0 if bg<0.0 else (1.0 if bg>1.0 else bg)
+                    
+                    r = 0 if r<0 else (65535 if r>65535 else r)
+                    g = 0 if g<0 else (65535 if g>65535 else g)
+                    b = 0 if b<0 else (65535 if b>65535 else b)
+                    
+                    #Conversion to linear scale
+                    #rf = rg/4.5 if rg<=0.081 else ((rg+0.099)/1.099)**(gamma)
+                    #gf = gg/4.5 if gg<=0.081 else ((gg+0.099)/1.099)**(gamma)
+                    #bf = bg/4.5 if bg<=0.081 else ((bg+0.099)/1.099)**(gamma)
+                    
+                    #Conversion to linear scale using a log scale
+                    r = self.LUT[r]
+                    g = self.LUT[g]
+                    b = self.LUT[b]
+                    
+                    #Flatfield correction
+                    rd = sqrt(<float>((i-half_height)**2 + (j-half_width)**2))
+                    if rd <= self.rmin:
+                        cr = self.red[0]
+                        cg = self.green[0] 
+                        cb = self.blue[0] 
+                    elif rd >= self.rmax:
+                        cr = self.red[self.size - 1]
+                        cg = self.green[self.size - 1] 
+                        cb = self.blue[self.size - 1] 
+                    else:
+                        position = (rd - self.rmin) / self.dr
+                        cp = ceil(position)
+                        fp = floor(position)
+                        if cp == fp:
+                            cr = self.red[<int>cp]
+                            cg = self.green[<int>cp] 
+                            cb = self.blue[<int>cp] 
+                        else: #Bilinear interpolation
+                            delta_low = position - fp
+                            delta_hi = cp - position
+                            cr = self.red[<int>fp]*delta_hi + self.red[<int>cp]*delta_low
+                            cg = self.green[<int>fp]*delta_hi + self.green[<int>cp]*delta_low
+                            cb = self.blue[<int>fp]*delta_hi + self.blue[<int>cp]*delta_low
+                    r = <int>(r * cr + 0.5)
+                    g = <int>(g * cg + 0.5)
+                    b = <int>(b * cb + 0.5)
+                    
+                    #Conversion to gamma scale
+                    #rg = rf*4.5 if rf<=0.018 else (rf**0.45)*1.099 - 0.099
+                    #gg = gf*4.5 if gf<=0.018 else (gf**0.45)*1.099 - 0.099
+                    #bg = bf*4.5 if bf<=0.018 else (bf**0.45)*1.099 - 0.099
+                    
+                    #Normalization
+                    r = 0 if r<0 else (65535 if r>65535 else r)
+                    g = 0 if g<0 else (65535 if g>65535 else g)
+                    b = 0 if b<0 else (65535 if b>65535 else b)
 
-                r = <int> (255*rg)
-                g = <int> (255*gg)
-                b = <int> (255*bg)
-                
-                rgb[i, j, 0] = r
-                rgb[i, j, 1] = g
-                rgb[i, j, 2] = b
-                histo[1, r] += 1
-                histo[2, g] += 1
-                histo[3, b] += 1
+                    #r = <int> (255*rg)
+                    #g = <int> (255*gg)
+                    #b = <int> (255*bg)
+                    
+                    #rgb[i, j, 0] = r
+                    #rgb[i, j, 1] = g
+                    #rgb[i, j, 2] = b
+                    
+                    histo[1, r>>8] += 1
+                    histo[2, g>>8] += 1
+                    histo[3, b>>8] += 1
                 
         return numpy.asarray(rgb), numpy.asarray(histo)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from __future__ import division, print_function
 import os
-from collections import namedtuple, OrderedDict
+from collections import namedtuple, OrderedDict, deque
 import time
 import threading
 import json
@@ -253,10 +253,11 @@ class Camera(threading.Thread):
         "quit the main loop and end the thread"
         self.quit_event.set()
 
-    def pause(self):
+    def pause(self, wait=True):
         "pause the recording, wait for the current value to be acquired"
         self._can_record.clear()
-        self._done_recording.wait()
+        if wait:
+            self._done_recording.wait()
     
     def resume(self):
         "resume the recording"
@@ -387,6 +388,7 @@ class Saver(threading.Thread):
     "This thread is in charge of saving the frames arriving from the queue on the disk"
     def __init__(self, folder="/mnt", queue=None, quit_event=None):
         threading.Thread.__init__(self, name="Saver")
+        self.sRGB = _colors.SRGB()
         self.queue = queue or Queue()
         self.quit_event = quit_event or threading.Signal()
         self.folder = os.path.abspath(folder)
@@ -405,16 +407,23 @@ class Saver(threading.Thread):
                 comments = OrderedDict((("index", frame.index),
                                         ("summed", 1)))
                 exposure_speed = frame.camera_meta.get("exposure_speed", 1)
-                while frames and exposure_speed > 0.5*1e6/frame.camera_meta.get("framerate") and (frame.yuv[:, :, 0].max() < 200):
-                    other = frames.pop()
-                    #TODO: merge in linear RGB space
-                    frame.yuv[:, :, 0] = (frame.yuv[:, :, 0].astype(int) + other.yuv[:, :, 0]).clip(0,235)
-                    comments["summed"] += 1
-                    exposure_speed = other.camera_meta.get("exposure_speed", 1)                    
+                RGB16 = frame.rgb
+                if exposure_speed > 5e5/frame.camera_meta.get("framerate"):
+                    while frames:
+                        other = frames.pop()
+                        #merge in linear RGB space
+                        summed, over = self.sRGB.sum(RGB16, other.rgb)
+                        if over:
+                            break
+                        else:
+                            RGB16 = summed
+                        comments["summed"] += 1
+                        exposure_speed += other.camera_meta.get("exposure_speed", 1)                    
                     
                 name = os.path.join(self.folder, frame.get_date_time()+".jpg")
                 logger.info("Save frame #%i as %s sum of %i", frame.index, name, comments["summed"])
-                Image.fromarray(frame.rgb).save(name, quality=90, optimize=True, progressive=True)
+                rgb8 = self.sRGB.compress(RGB16)
+                Image.fromarray(rgb8).save(name, quality=90, optimize=True, progressive=True)
                 exif = pyexiv2.ImageMetadata(name)
                 exif.read()
                 speed = Fraction(int(exposure_speed), 1000000)
@@ -500,5 +509,5 @@ class Analyzer(threading.Thread):
             now = time.time()
             self.output_queue.put(awb)
             self.queue.task_done()
-            logger.debug("Analysis of frame #%i took: %.3fs, delay since acquisition: %.3fs", frame.index, now-t0, now-frame.timestamp)
+            logger.info("Analysis of frame #%i took: %.3fs, delay since acquisition: %.3fs", frame.index, now-t0, now-frame.timestamp)
             

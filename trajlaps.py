@@ -22,7 +22,7 @@ import sys
 import math
 from fractions import Fraction
 import json
-from collections import namedtuple, OrderedDict
+from collections import namedtuple, OrderedDict, deque
 from argparse import ArgumentParser
 import servo
 from accelero import Accelerometer
@@ -117,6 +117,7 @@ class Trajectory(object):
         Operates usually in a separated thread
 		"""
         pan, tilt = pos
+        self.camera.pause(wait=False)
         self.accelero.pause()
         self.camera.pause()
         self.servo_tilt.move(tilt)
@@ -163,6 +164,7 @@ class TimeLaps(threading.Thread):
                  folder=".", avg_awb=200, avg_ev=25, config_file="parameters.json"):
         threading.Thread.__init__(self, name="TimeLaps")
         self.storage = {}
+        self.storage_maxlen = 10
         self.camera_queue = Queue()
         self.analysis_queue = Queue()
         self.saving_queue = Queue()
@@ -249,10 +251,9 @@ class TimeLaps(threading.Thread):
             frame = self.camera_queue.get()
             frame.position = self.position
             self.analysis_queue.put(frame)
-            if self.position in self.storage:
-                self.storage[self.position].append(frame) 
-            else:
-                self.storage[self.position] = [frame]
+            if self.position not in self.storage:
+                self.storage[self.position] = deque(maxlen=self.storage_maxlen) 
+            self.storage[self.position].append(frame) 
             if time.time() >= tl.next_img:
                 frame.gravity = self.accelero.get()
                 self.saving_queue.put(self.storage.pop(self.position))
