@@ -442,7 +442,7 @@ class Saver(threading.Thread):
                 exif.comment = json.dumps(comments)
                 exif.write(preserve_timestamps=True)
             self.queue.task_done()
-            logger.info("Saving of frame #%i took %.3fs", frame.index, time.time() - t0)
+            logger.info("Saving of frame #%i took %.3fs, sum of %s", frame.index, time.time() - t0, comments["summed"])
 
 
 class Analyzer(threading.Thread):

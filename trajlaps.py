@@ -61,7 +61,7 @@ trajectory={
     
 class DummyAccelero(object):
     """Dummy accelerometer"""
-    def pause(self):
+    def pause(self, wait=True):
         pass
     def resume(self):
         pass
@@ -181,7 +181,6 @@ class TimeLaps(threading.Thread):
         signal.signal(signal.SIGINT, self.quit)
         self.accelero = Accelerometer() 
         self.accelero.start()
-        self.trajectory = Trajectory(accelero=self.accelero)
         self.folder = folder
         
         self.camera = Camera(resolution=resolution,                              
@@ -195,6 +194,8 @@ class TimeLaps(threading.Thread):
                              config_queue=self.config_queue,
                              quit_event=self.quit_event,
                              )
+        self.trajectory = Trajectory(accelero=self.accelero, camera=self.camera)
+
         self.load_config(config_file) 
         self.saver = Saver(folder=self.folder,
                            queue=self.saving_queue, 

@@ -144,38 +144,43 @@ cdef class SRGB:
     def __dealloc__(self):
         self.LUT = None
     
-    def compress(self, numpy.uint16_t[:, ::1] inp):
+    def compress(self, numpy.uint16_t[:, :, ::1] inp):
         """Compress a RGB16 linear into a sRGB8 image"""
         cdef: 
-            int width, height, i, j
-            numpy.uint8_t[:, ::1] outp
+            int width, height, i, j, k
+            numpy.uint8_t[:, :, ::1] out
         
         height = inp.shape[0]
         width = inp.shape[1]
-        out = numpy.empty((height, width), dtype=numpy.uint8)
-        for i in range(height):
-            for j in range(width):
-                out[i, j] = self.LUT[inp[i,j]]
+        out = numpy.empty((height, width, 3), dtype=numpy.uint8)
+        with nogil:
+            for i in range(height):
+                for j in range(width):
+                    for k in range(3):
+                        out[i, j, k] = self.LUT[inp[i, j, k]]
         return numpy.asarray(out)
 
-    def sum(numpy.uint16_t[:, ::1] im1, numpy.uint16_t[:, ::1] im2):
+    @staticmethod
+    def sum(numpy.uint16_t[:, :, ::1] im1, numpy.uint16_t[:, :, ::1] im2):
         "sum two images and flag if overflow"
         cdef: 
             bint overflow = False
-            int width, height, i, j, r
-            numpy.uint16_t[:, ::1] outp
+            int width, height, i, j, k, r
+            numpy.uint16_t[:, :, ::1] out
         
         height = im1.shape[0]
         width = im1.shape[1]
-        out = numpy.empty((height, width), dtype=numpy.uint16)
-        for i in range(height):
-            for j in range(width):
-                r = im1[i,j] + im2[i,j]
-                if r > 65535: 
-                    overflow=True
-                    out[i, j] = 65535
-                else:
-                    out[i, j] = r
+        out = numpy.empty((height, width, 3), dtype=numpy.uint16)
+        with nogil:
+            for i in range(height):
+                for j in range(width):
+                    for k in range(3):
+                        r = im1[i,j,k] + im2[i,j,k]
+                        if r > 65535: 
+                            overflow=True
+                            out[i, j, k] = 65535
+                        else:
+                            out[i, j, k] = r
         return numpy.asarray(out), overflow
         
 cdef class Flatfield:
