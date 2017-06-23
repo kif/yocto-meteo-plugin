@@ -165,6 +165,10 @@ class TimeLaps(threading.Thread):
         threading.Thread.__init__(self, name="TimeLaps")
         self.storage = {}
         self.storage_maxlen = 10
+        self.pool_of_analyzers = []
+        self.pool_size_analyzer = 2
+        self.pool_of_savers = []
+        self.pool_size_savers = 2
         self.camera_queue = Queue()
         self.analysis_queue = Queue()
         self.saving_queue = Queue()
@@ -194,19 +198,24 @@ class TimeLaps(threading.Thread):
                              config_queue=self.config_queue,
                              quit_event=self.quit_event,
                              )
+        self.camera.warm_up()      
         self.trajectory = Trajectory(accelero=self.accelero, camera=self.camera)
-
-        self.load_config(config_file) 
-        self.saver = Saver(folder=self.folder,
-                           queue=self.saving_queue, 
-                           quit_event=self.quit_event)
-        self.analyzer = Analyzer(frame_queue=self.analysis_queue, 
+        self.load_config(config_file)
+        
+        for i in range(self.pool_size_savers):
+            saver = Saver(folder=self.folder,
+                          queue=self.saving_queue, 
+                          quit_event=self.quit_event)
+            saver.start()
+            self.pool_of_savers.append(saver)
+            
+        for i in range(self.pool_size_analyzer):
+            analyzer = Analyzer(frame_queue=self.analysis_queue, 
                                  config_queue=self.config_queue, 
                                  quit_event=self.quit_event)
-        self.saver.start()
-        self.analyzer.start()
+            analyzer.start()
+            self.pool_of_analyzers.append(analyzer)
         self.position = self.trajectory.goto(self.delay)  
-        self.camera.warm_up()      
         self.camera.start()
     
     def __del__(self):

@@ -27,6 +27,7 @@ except ImportError:
     colors = None
 else:
     colors = _colors.Flatfield("flatfield.txt")
+    sRGB = _colors.SRGB()
 ExpoRedBlue = namedtuple("ExpoRedBlue", ("ev", "dev", "over", "red", "green", "blue"))
 GainRedBlue = namedtuple("GainRedBlue", ("red", "blue"))
 
@@ -176,15 +177,15 @@ class Frame(object):
         with open(fname, "w") as f:
             f.write(self.data)
         fname = self.get_date_time()+".json"
-        comments = OrderedDict((("index", self.index)))
-        if frame.position:
-            comments["pan"] = frame.position.pan
-            comments["tilt"] = frame.position.tilt
+        comments = OrderedDict((("index", self.index),))
+        if self.position:
+            comments["pan"] = self.position.pan
+            comments["tilt"] = self.position.tilt
         if frame.gravity:
-            comments["gx"] = frame.gravity.x
-            comments["gy"] = frame.gravity.y
-            comments["gz"] = frame.gravity.z
-        comments.update(frame.camera_meta)
+            comments["gx"] = self.gravity.x
+            comments["gy"] = self.gravity.y
+            comments["gz"] = self.gravity.z
+        comments.update(self.camera_meta)
         with open(fname, "w") as f:
             f.write(json.dumps(comments, indent=4))
         logger.info("Saved YUV raw data %i %s", self.index, fname)
@@ -292,6 +293,7 @@ class Camera(threading.Thread):
                     "digital_gain": float(self.camera.digital_gain),
                     "exposure_compensation": float(self.camera.exposure_compensation),
                     "exposure_speed": float(self.camera.exposure_speed),
+                    "exposure_mode": self.camera.exposure_mode,
                     "framerate": float(self.camera.framerate),
                     "revision": self.camera.revision,
                     "shutter_speed": float(self.camera.shutter_speed),
@@ -388,7 +390,6 @@ class Saver(threading.Thread):
     "This thread is in charge of saving the frames arriving from the queue on the disk"
     def __init__(self, folder="/mnt", queue=None, quit_event=None):
         threading.Thread.__init__(self, name="Saver")
-        self.sRGB = _colors.SRGB()
         self.queue = queue or Queue()
         self.quit_event = quit_event or threading.Signal()
         self.folder = os.path.abspath(folder)
@@ -412,7 +413,7 @@ class Saver(threading.Thread):
                     while frames:
                         other = frames.pop()
                         #merge in linear RGB space
-                        summed, over = self.sRGB.sum(RGB16, other.rgb)
+                        summed, over = sRGB.sum(RGB16, other.rgb)
                         if over:
                             break
                         else:
@@ -422,7 +423,7 @@ class Saver(threading.Thread):
                     
                 name = os.path.join(self.folder, frame.get_date_time()+".jpg")
                 logger.info("Save frame #%i as %s sum of %i", frame.index, name, comments["summed"])
-                rgb8 = self.sRGB.compress(RGB16)
+                rgb8 = sRGB.compress(RGB16)
                 Image.fromarray(rgb8).save(name, quality=90, optimize=True, progressive=True)
                 exif = pyexiv2.ImageMetadata(name)
                 exif.read()
@@ -494,9 +495,14 @@ class Analyzer(threading.Thread):
             csb = numpy.cumsum(histo[3])
             
             pos = csr[-1] * (1.0 - target_rgb)
-            pos_r = numpy.where(csr >= pos)[0][0]
-            pos_g = numpy.where(csg >= pos)[0][0]
-            pos_b = numpy.where(csb >= pos)[0][0]
+            try:
+                pos_r = numpy.where(csr >= pos)[0][0]
+                pos_g = numpy.where(csg >= pos)[0][0]
+                pos_b = numpy.where(csb >= pos)[0][0]
+            except IndexError as e:
+                logger.error(e)
+                self.queue.task_done()
+                continue
             rg, bg = frame.camera_meta.get("awb_gains", (1.0, 1.0))
             if rg ==0.0: 
                 rg = 1.0

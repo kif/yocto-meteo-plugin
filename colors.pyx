@@ -5,6 +5,28 @@ import numpy
 cimport numpy 
 from libc.math cimport sqrt, ceil, floor
 
+
+cpdef int pseudo_dist(int x, int y) nogil:
+    """Calculate sqrt(x*x + y*y) in an approximate way, using only integers
+    http://www.flipcode.com/archives/Fast_Approximate_Distance_Functions.shtml
+    """
+    cdef int mini, maxi, approx
+    if x < 0:
+        x = -x
+    if y < 0:
+        y = -y
+    if x < y:
+        mini = x
+        maxi = y
+    else:
+        mini = y
+        maxi = x
+    approx = maxi * 1007 + mini * 441
+    if maxi < (mini <<4):
+        approx -= maxi * 40
+    return (approx + 512) >> 10
+    
+
 def yuv420_to_yuv(stream, resolution):
     """Convert a YUV420 linear stream into an image YUV444
     
@@ -79,13 +101,10 @@ def yuv420_to_rgb(stream, resolution):
                 histo[0, y] += 1
                 # integer version (*65535)
                 y -= 16
-                if y<0: 
-                    y=0
-                if y>219:
-                    y=219
-                y *= 262144
+                y=0 if y<0 else (219 if y>219 else y)                
                 u -= 128
                 v -= 128
+                y *= 262144
                 r = (y + 104597 * v) >> 16
                 g = (y - 25675 * v - 53278 * u) >> 16
                 b = (y + 132201 * u) >> 16
@@ -132,15 +151,17 @@ cdef class SRGB:
     def __cinit__(self):
         cdef:
             float c, a=0.055, res
-            int i 
+            int i, s 
         self.LUT = numpy.empty(1<<16, dtype=numpy.uint8)
-        for i in range(1<<16):
-            c = i/65535
-            if c < 0.0031308:
-                self.LUT[i] = <int>(12.92 * c *255 + 0.5)
-            else:
-                self.LUT[i] = <int>(((1+a)*c**(1/2.4) - a) * 255 + 0.5)
-            
+        with nogil:
+            for i in range(1<<16):
+                c = <float>i / 65535.
+                if c < 0.0031308:
+                    res = <int>(12.92 * c *255 + 0.5)
+                else:
+                    res = (((1+a)*c**(1/2.4) - a) * 255 + 0.5)
+                self.LUT[i] = <int> res
+
     def __dealloc__(self):
         self.LUT = None
     
@@ -186,7 +207,7 @@ cdef class SRGB:
 cdef class Flatfield:
     cdef: 
         float[::1] radius, red, green, blue
-        numpy.uint16_t[::1] LUT
+        readonly numpy.uint16_t[::1] LUT
         float rmin, rmax, dr
         int size
         
@@ -207,12 +228,13 @@ cdef class Flatfield:
             int i 
         self.LUT = numpy.empty(1<<16, dtype=numpy.uint16)
         for i in range(1<<16):
-            c = i/65535.
+            c = <float>i / 65535.
             if c < 0.081:
-                self.LUT[i] = <int>((i/slope) + 0.5)
+                res = (i/slope) + 0.5
             else:
-                self.LUT[i] = <int>(65535 * ((c+a)/(1+a))**(gamma) + 0.5)
-    
+                res = 65535 * ((c+a)/(1+a))**(gamma) + 0.5
+            self.LUT[i] = <int> res 
+            
     def __dealloc__(self):
         self.radius = None
         self.red = None
@@ -269,27 +291,27 @@ cdef class Flatfield:
                     v =cstream[ylen + uvlen + l + m]
                     histo[0, y] += 1
                     y -= 16
-                    if y<0: 
-                        y=0
-                    if y>219:
-                        y=219
+                    y=0 if y<0 else (219 if y>219 else y)
                     u -= 128
                     v -= 128
                     
-                    yf = y * ys 
-                    r = <int> ((yf + rv * v) +0.5)
-                    g = <int> ((yf + gv * v + gu * u) +0.5)
-                    b = <int> ((yf + bu * u) +0.5)
+                    # integer version (*65535) 
+                    y *= 262144
+                    #add half of the offset to cope for rounding error
+                    r = (y + 104597 * v + (1<<7) ) >> 8 
+                    g = (y - 53278 * v - 25675 * u + (1<<7)) >> 8
+                    b = (y + 132201 * u + (1<<7)) >> 8
                     
-                    #rg = 0.0 if rg<0.0 else (1.0 if rg>1.0 else rg)
-                    #gg = 0.0 if gg<0.0 else (1.0 if gg>1.0 else gg)
-                    #bg = 0.0 if bg<0.0 else (1.0 if bg>1.0 else bg)
-                    
+                    #Clip to 0-65535
                     r = 0 if r<0 else (65535 if r>65535 else r)
                     g = 0 if g<0 else (65535 if g>65535 else g)
                     b = 0 if b<0 else (65535 if b>65535 else b)
+
+                    histo[1, (r + (1<<7)) >> 8] += 1
+                    histo[2, (g + (1<<7)) >> 8] += 1
+                    histo[3, (b + (1<<7)) >> 8] += 1
                     
-                    #Conversion to linear scale
+                    #Conversion to linear scale: faster done with LUT
                     #rf = rg/4.5 if rg<=0.081 else ((rg+0.099)/1.099)**(gamma)
                     #gf = gg/4.5 if gg<=0.081 else ((gg+0.099)/1.099)**(gamma)
                     #bf = bg/4.5 if bg<=0.081 else ((bg+0.099)/1.099)**(gamma)
@@ -337,18 +359,10 @@ cdef class Flatfield:
                     g = 0 if g<0 else (65535 if g>65535 else g)
                     b = 0 if b<0 else (65535 if b>65535 else b)
 
-                    #r = <int> (255*rg)
-                    #g = <int> (255*gg)
-                    #b = <int> (255*bg)
+                    rgb[i, j, 0] = r
+                    rgb[i, j, 1] = g
+                    rgb[i, j, 2] = b
                     
-                    #rgb[i, j, 0] = r
-                    #rgb[i, j, 1] = g
-                    #rgb[i, j, 2] = b
-                    
-                    histo[1, r>>8] += 1
-                    histo[2, g>>8] += 1
-                    histo[3, b>>8] += 1
-                
         return numpy.asarray(rgb), numpy.asarray(histo)
 
     def yuv420_to_yuv(self, stream, resolution):
