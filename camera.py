@@ -5,6 +5,7 @@ from collections import namedtuple, OrderedDict, deque
 import time
 import threading
 import json
+import gc
 try:
     from Queue import Queue
 except ImportError:
@@ -181,7 +182,7 @@ class Frame(object):
         if self.position:
             comments["pan"] = self.position.pan
             comments["tilt"] = self.position.tilt
-        if frame.gravity:
+        if self.gravity:
             comments["gx"] = self.gravity.x
             comments["gy"] = self.gravity.y
             comments["gz"] = self.gravity.z
@@ -328,7 +329,7 @@ class Camera(threading.Thread):
     def run(self):
         "main thread activity"
         self.camera.awb_mode = "off"
-        self.camera.exposure_mode = "verylong"
+        self.camera.exposure_mode = "auto"#"verylong"
         self._done_recording.clear()
         for foo in self.camera.capture_continuous(self.stream, format='yuv'):
             self._done_recording.set()
@@ -420,7 +421,8 @@ class Saver(threading.Thread):
                             RGB16 = summed
                         comments["summed"] += 1
                         exposure_speed += other.camera_meta.get("exposure_speed", 1)                    
-                    
+                frames = None
+                gc.collect()
                 name = os.path.join(self.folder, frame.get_date_time()+".jpg")
                 logger.info("Save frame #%i as %s sum of %i", frame.index, name, comments["summed"])
                 rgb8 = sRGB.compress(RGB16)
