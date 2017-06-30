@@ -22,7 +22,7 @@ cpdef int pseudo_dist(int x, int y) nogil:
         mini = y
         maxi = x
     approx = maxi * 1007 + mini * 441
-    if maxi < (mini <<4):
+    if maxi < (mini << 4):
         approx -= maxi * 40
     return (approx + 512) >> 10
     
@@ -62,7 +62,8 @@ def yuv420_to_yuv(stream, resolution):
                 histo[y] += 1
     return numpy.asarray(yuv), numpy.asarray(histo)
     
-def yuv420_to_rgb(stream, resolution):
+    
+def yuv420_to_rgb8(stream, resolution):
     """Convert a YUV420 linear stream into an image RGB
     array: 
     [[1.164383  0  1.596027
@@ -75,12 +76,11 @@ def yuv420_to_rgb(stream, resolution):
     """
     cdef:
         int i, j, k, l, m, width, height, fwidth, fheight, ylen, uvlen, y, u, v, r, g, b
-        #float yf, uf, vf
         numpy.uint8_t[::1] cstream = numpy.fromstring(stream, numpy.uint8)
-        numpy.uint8_t[:,:,::1] rgb
+        numpy.uint8_t[:, :, ::1] rgb
         int[:, ::1] histo
     
-    histo = numpy.zeros((4,256), dtype=numpy.int32)
+    histo = numpy.zeros((4, 256), dtype=numpy.int32)
     
     width, height = resolution
     fwidth = (width + 31) & ~(31)
@@ -97,11 +97,11 @@ def yuv420_to_rgb(stream, resolution):
                 m = j // 2
                 y = cstream[k + j]
                 u = cstream[ylen + l + m]
-                v =cstream[ylen + uvlen + l + m]
+                v = cstream[ylen + uvlen + l + m]
                 histo[0, y] += 1
                 # integer version (*65535)
                 y -= 16
-                y=0 if y<0 else (219 if y>219 else y)                
+                y = 0 if y < 0 else (219 if y > 219 else y)                
                 u -= 128
                 v -= 128
                 y *= 262144
@@ -117,19 +117,11 @@ def yuv420_to_rgb(stream, resolution):
                 #g = <numpy.uint8_t> (yf - 0.813 * vf - 0.392 * uf)
                 #b = <numpy.uint8_t> (yf + 2.017 * uf)
                 
-                if r < 0:
-                    r = 0
-                elif r > 255:
-                    r = 255
-                if b < 0:
-                    b = 0
-                elif b > 255:
-                    b = 255
-                if g < 0:
-                    g = 0
-                elif g > 255:
-                    g = 255
-                
+                # clip to the 0-255 range
+                r = 0 if r < 0 else (255 if r > 255 else r)
+                g = 0 if g < 0 else (255 if g > 255 else g)
+                b = 0 if b < 0 else (255 if b > 255 else b)
+               
                 rgb[i, j, 0] = r
                 rgb[i, j, 1] = g
                 rgb[i, j, 2] = b
@@ -137,6 +129,89 @@ def yuv420_to_rgb(stream, resolution):
                 histo[2, g] += 1
                 histo[3, b] += 1
             
+    return numpy.asarray(rgb), numpy.asarray(histo)
+
+
+def yuv420_to_rgb16(stream, resolution):
+    """Convert a YUV420 linear stream into a gamma compressed image RGB16
+    array: 
+    [[1.164383  0  1.596027
+     [1.164383 -0.391762 -0.812968
+     [1.164383 2.017232 0 
+    
+    :param stream: string (bytes) with the stream
+    :param resolution: 2-tuple (width, height)
+    :return: YUV array + historgram of Y,R,G,B
+    """
+    cdef:
+        int i, j, k, l, m, width, height, fwidth, fheight, ylen, uvlen, 
+        int y, u, v, r, g, b, half_width, half_height
+        float rd, cr, cg, cb, position, fp, cp, delta_hi, delta_low, rf, gf, bf
+        float yf, uf, vf, rg, gg, bg, gamma
+        int ys, rv, gu, gv, bu 
+        numpy.uint8_t[::1] cstream = numpy.fromstring(stream, numpy.uint8)
+        numpy.uint16_t[:, :, ::1] rgb
+        int[:, ::1] histo
+    
+    histo = numpy.zeros((4, 256), dtype=numpy.int32)
+    
+    # Coef for Y'UV -> R'G'B'
+    ys = ((1 << 16) - 1) / (235 - 16) #1.164
+    rv = ((1 << 16) - 1) * 1.596027 / ((1 << 8) - 1) + 0.5
+    gu = ((1 << 16) - 1) * 0.391762 / ((1 << 8) - 1) + 0.5
+    gv = ((1 << 16) - 1) * 0.812968 / ((1 << 8) - 1) + 0.5
+    bu = ((1 << 16) - 1) * 2.017232 / ((1 << 8) - 1) + 0.5
+    
+    width, height = resolution
+    half_width = width // 2
+    half_height = height // 2
+    fwidth = (width + 31) & ~(31)
+    fheight = (height + 15) & ~ (15)
+    ylen = fwidth * fheight
+    uvlen = ylen // 4
+    assert cstream.size >= (ylen + 2 * uvlen), "stream is len enough"
+    rgb = numpy.empty((height, width, 3), dtype=numpy.uint16)
+    with nogil:
+        for i in range(height):
+            k = fwidth * i
+            l = (fwidth // 2) * (i // 2)
+            for j in range(width):
+                m = j // 2
+                y = cstream[k + j]
+                u = cstream[ylen + l + m]
+                v = cstream[ylen + uvlen + l + m]
+                histo[0, y] += 1
+                y -= 16
+                y = 0 if y < 0 else (219 if y > 219 else y)
+                u -= 128
+                v -= 128
+                
+                # integer version (*65535) 
+                y *= ys
+                #add half of the offset to cope for rounding error
+                r = (y + rv * v)   
+                g = (y - gv * v - gv * u)
+                b = (y + bu * u)
+                
+                #Clip to 0-65535
+                r = 0 if r < 0 else (65535 if r > 65535 else r)
+                g = 0 if g < 0 else (65535 if g > 65535 else g)
+                b = 0 if b < 0 else (65535 if b > 65535 else b)
+
+                histo[1, (r + (1 << 7)) >> 8] += 1
+                histo[2, (g + (1 << 7)) >> 8] += 1
+                histo[3, (b + (1 << 7)) >> 8] += 1
+                
+                
+                #Normalization
+                r = 0 if r < 0 else (65535 if r > 65535 else r)
+                g = 0 if g < 0 else (65535 if g > 65535 else g)
+                b = 0 if b < 0 else (65535 if b > 65535 else b)
+
+                rgb[i, j, 0] = r
+                rgb[i, j, 1] = g
+                rgb[i, j, 2] = b
+                
     return numpy.asarray(rgb), numpy.asarray(histo)
 
 
