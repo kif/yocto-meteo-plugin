@@ -97,7 +97,7 @@ class Frame(object):
                 if self._yuv is None:
                     resolution = self.camera_meta.get("resolution", (640, 480))
                     if colors:
-                        yuv = colors.yuv420_to_yuv(self.data, resolution)[0]
+                        yuv = _colors.yuv420_to_yuv(self.data, resolution)[0]
                     else:
                         width, height = resolution
                         fwidth = (width + 31) & ~(31)
@@ -133,13 +133,13 @@ class Frame(object):
                 if self._rgb is None:
                     if colors:
                         resolution = self.camera_meta.get("resolution", (640, 480))
-                        self._rgb, self._histograms = colors.yuv420_to_rgb(self.data, resolution)
+                        self._rgb, self._histograms = colors.yuv420_to_rgb16(self.data, resolution)
                     else:
                         YUV[:, :, 0] = YUV[:, :, 0] - 16  # Offset Y by 16
                         YUV[:, :, 1:] = YUV[:, :, 1:] - 128 # Offset UV by 128
                         # Calculate the dot product with the matrix to produce RGB output,
                         # clamp the results to byte range and convert to bytes
-                        self._rgb = YUV.dot(self.YUV2RGB).clip(0, 255).astype(numpy.uint8)
+                        self._rgb = (YUV.dot(self.YUV2RGB)*257.0).clip(0, 65535).astype(numpy.uint16)
         return self._rgb
     
     @property
@@ -158,7 +158,7 @@ class Frame(object):
         return self._histograms
                 
                 
-    @staticmethod
+    @classmethod
     def load(cls, fname):
         """load the raw data on one side and the header on the other"""
         
@@ -328,7 +328,7 @@ class Camera(threading.Thread):
 
     def run(self):
         "main thread activity"
-        self.camera.awb_mode = "off"
+        self.camera.awb_mode = "auto" #"off"
         self.camera.exposure_mode = "auto"#"verylong"
         self._done_recording.clear()
         for foo in self.camera.capture_continuous(self.stream, format='yuv'):
@@ -343,6 +343,7 @@ class Camera(threading.Thread):
             if self.quit_event.is_set():
                 break
             # update the camera settings if needed:
+            # Disabled for now at trajlaps level
             if not self.config_queue.empty():
                 while not self.config_queue.empty():
                     evrb = self.config_queue.get()

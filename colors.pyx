@@ -76,6 +76,7 @@ def yuv420_to_rgb8(stream, resolution):
     """
     cdef:
         int i, j, k, l, m, width, height, fwidth, fheight, ylen, uvlen, y, u, v, r, g, b
+        float uf, yf, vf
         numpy.uint8_t[::1] cstream = numpy.fromstring(stream, numpy.uint8)
         numpy.uint8_t[:, :, ::1] rgb
         int[:, ::1] histo
@@ -100,22 +101,22 @@ def yuv420_to_rgb8(stream, resolution):
                 v = cstream[ylen + uvlen + l + m]
                 histo[0, y] += 1
                 # integer version (*65535)
-                y -= 16
-                y = 0 if y < 0 else (219 if y > 219 else y)                
-                u -= 128
-                v -= 128
-                y *= 262144
-                r = (y + 104597 * v) >> 16
-                g = (y - 25675 * v - 53278 * u) >> 16
-                b = (y + 132201 * u) >> 16
+                #y -= 16
+                #y = 0 if y < 0 else (219 if y > 219 else y)                
+                #u -= 128
+                #v -= 128
+                #y *= 262144
+                #r = (y + 104597 * v) >> 16
+                #g = (y - 25675 * v - 53278 * u) >> 16
+                #b = (y + 132201 * u) >> 16
                 
                 # Floating point version
-                #yf = 1.164 * <float> y
-                #uf = <float> u
-                #vf = <float> v
-                #r = <numpy.uint8_t> (yf + 1.596 * vf)
-                #g = <numpy.uint8_t> (yf - 0.813 * vf - 0.392 * uf)
-                #b = <numpy.uint8_t> (yf + 2.017 * uf)
+                yf = 1.164383 * (<float> y - 16.)
+                uf = <float> u - 128.0
+                vf = <float> v - 128.0
+                r = <numpy.uint8_t> (yf + 1.596027 * vf)
+                g = <numpy.uint8_t> (yf - 0.812968 * vf - 0.391762 * uf)
+                b = <numpy.uint8_t> (yf + 2.017232 * uf)
                 
                 # clip to the 0-255 range
                 r = 0 if r < 0 else (255 if r > 255 else r)
@@ -316,7 +317,7 @@ cdef class Flatfield:
         self.green = None
         self.blue = None
         
-    def yuv420_to_rgb(self, stream, resolution):
+    def yuv420_to_rgb16(self, stream, resolution):
         """Convert a YUV420 linear stream into an image RGB
         array: 
         [[1.164383  0  1.596027
@@ -331,7 +332,8 @@ cdef class Flatfield:
             int i, j, k, l, m, width, height, fwidth, fheight, ylen, uvlen, 
             int y, u, v, r, g, b, half_width, half_height
             float rd, cr, cg, cb, position, fp, cp, delta_hi, delta_low, rf, gf,bf
-            float yf, uf, vf, ys, rv, gu, gv, bu, rg, gg, bg, gamma
+            float yf, uf, vf, rg, gg, bg, gamma
+            int ys, rv, gu, gv, bu
             numpy.uint8_t[::1] cstream = numpy.fromstring(stream, numpy.uint8)
             numpy.uint16_t[:,:,::1] rgb
             int[:, ::1] histo
@@ -339,12 +341,18 @@ cdef class Flatfield:
         histo = numpy.zeros((4, 256), dtype=numpy.int32)
         
         #Coef for Y'UV -> R'G'B'
-        ys = 65535 / (235-16) #1.164
-        rv = 65535 * 1.596 / 255
-        gu = -0.392 * 65535 / 255
-        gv = -0.813 * 65535 / 255
-        bu = 2.017 * 65535 / 255
+        #ys = 65535 / (235-16) #1.164
+        #rv = 65535 * 1.596 / 255
+        #gu = -0.392 * 65535 / 255
+        #gv = -0.813 * 65535 / 255
+        #bu = 2.017 * 65535 / 255
         #gamma = 1/0.45
+        # Coef for Y'UV -> R'G'B'
+        ys = <int> ((1 << 16) - 1) / (235 - 16) #1.164
+        rv = <int> (((1 << 16) - 1) * 1.596027 / ((1 << 8) - 1) + 0.5)
+        gu = <int> (((1 << 16) - 1) * 0.391762 / ((1 << 8) - 1) + 0.5)
+        gv = <int> (((1 << 16) - 1) * 0.812968 / ((1 << 8) - 1) + 0.5)
+        bu = <int> (((1 << 16) - 1) * 2.017232 / ((1 << 8) - 1) + 0.5)
         
         width, height = resolution
         half_width = width //2
@@ -371,11 +379,18 @@ cdef class Flatfield:
                     v -= 128
                     
                     # integer version (*65535) 
-                    y *= 262144
+                    y *= ys
                     #add half of the offset to cope for rounding error
-                    r = (y + 104597 * v + (1<<7) ) >> 8 
-                    g = (y - 53278 * v - 25675 * u + (1<<7)) >> 8
-                    b = (y + 132201 * u + (1<<7)) >> 8
+                    r = (y + rv * v)   
+                    g = (y - gv * v - gv * u)
+                    b = (y + bu * u)
+
+                    # integer version (*65535) 
+                    #y *= 262144
+                    #add half of the offset to cope for rounding error
+                    #r = (y + 104597 * v + (1<<7) ) >> 8 
+                    #g = (y - 53278 * v - 25675 * u + (1<<7)) >> 8
+                    #b = (y + 132201 * u + (1<<7)) >> 8
                     
                     #Clip to 0-65535
                     r = 0 if r<0 else (65535 if r>65535 else r)

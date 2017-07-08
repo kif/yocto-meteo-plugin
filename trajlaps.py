@@ -260,7 +260,7 @@ class TimeLaps(threading.Thread):
         while not self.quit_event.is_set():
             frame = self.camera_queue.get()
             frame.position = self.position
-            self.analysis_queue.put(frame)
+            #self.analysis_queue.put(frame)
             if self.position not in self.storage:
                 self.storage[self.position] = deque(maxlen=self.storage_maxlen) 
             self.storage[self.position].append(frame) 
