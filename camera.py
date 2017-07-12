@@ -328,8 +328,8 @@ class Camera(threading.Thread):
 
     def run(self):
         "main thread activity"
-        self.camera.awb_mode = "auto" #"off"
-        self.camera.exposure_mode = "auto"#"verylong"
+        self.camera.awb_mode = "off" # "auto"
+        self.camera.exposure_mode = "night" #"auto"
         self._done_recording.clear()
         for foo in self.camera.capture_continuous(self.stream, format='yuv'):
             self._done_recording.set()
