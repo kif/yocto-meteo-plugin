@@ -243,7 +243,13 @@ class TimeLaps(threading.Thread):
             self.delay = dico.get("delay", self.delay)
             self.folder = dico.get("folder", self.folder)
             
-    def save_config(self):
+    def save_config(self, index=None):
+        if index is not None:
+            fname = os.path.splitext(self.config_file)
+            fname = fname[0] + "_%05i"%index + fname[1]
+        else:
+            fname = self.config_file
+        logger.info("Save config to %s", fname)
         camera_config = self.camera.get_config()
         dico = OrderedDict([                           
                             ("delay", self.delay),
@@ -251,7 +257,7 @@ class TimeLaps(threading.Thread):
                             ("trajectory", self.trajectory.config),
                             ("camera", camera_config),
                             ])
-        with open(self.config_file,"w") as jsonfile:
+        with open(fname,"w") as jsonfile:
             jsonfile.write(json.dumps(dico, indent=4))
 
     def run(self):
@@ -280,6 +286,8 @@ class TimeLaps(threading.Thread):
                             self.saving_queue.qsize(),
                             self.config_queue.qsize()
                             )
+            if frame.index % 100 == 0:
+                self.save()
                                
 
 if __name__ == "__main__":
