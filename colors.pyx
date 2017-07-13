@@ -298,112 +298,116 @@ cdef class SRGB:
         
 cdef class Flatfield:
     cdef: 
-        readonly float[::1] radius, red, green, blue
-        readonly  int[::1] lut_r, lut_g, lut_b 
-        readonly numpy.uint16_t[::1] LUT
-        float rmin, rmax, dr
-        int size
+        readonly  numpy.uint16_t[::1] lut_r, lut_g, lut_b, LUT 
+        int nbits
         
-    def __cinit__(self, flatfile):
-        print("initialize the gamma LUT")
-        data = numpy.loadtxt(flatfile)
-        self.radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
-        self.red = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
-        self.green = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
-        self.blue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)
-        self.size = data.shape[0]
-        self.rmin = self.radius[0]
-        self.rmax = self.radius[self.size - 1]
-        self.dr = (self.rmax - self.rmin) / (self.size - 1)
-        
-        cdef:
-            #rg/4.5 if rg<=0.081 else ((rg+0.099)/1.099)**(gamma)
-            float c, a=0.099, res, slope=4.5, gamma=1.0/0.45
-            int i 
-        self.LUT = numpy.empty(1 << 16, dtype=numpy.uint16)
-        for i in range(1 << 16):
-            c = <float>i / 65535.
-            if c < 0.081:
-                res = (i / slope) + 0.5
-            else:
-                res = 65535 * ((c + a)/(1.0 + a))**(gamma) + 0.5
-            self.LUT[i] = <int> res
-        self.lut_r, self.lut_g, self.lut_b = self.calc_colors()
+    def __cinit__(self, flatfile, nbits=14):
+        self.nbits = nbits
+        self.LUT = self.calc_gamma()
+        self.lut_r, self.lut_g, self.lut_b = self.calc_colors(flatfile, nbits=self.nbits)      
 
     def __dealloc__(self):
-        self.radius = None
-        self.red = None
-        self.green = None
-        self.blue = None
+        #self.radius = None
+        #self.red = None
+        #self.green = None
+        #self.blue = None
+        #self.data = None
+        self.LUT = None
         self.lut_r = None
         self.lut_g = None
         self.lut_b = None
 
-    def calc_colors(self):
-        """Initalizes the tree colors LUTs, on 12 bits"""
+    def calc_gamma(self, float a=0.099, float slope=4.5, float gamma=1.0 / 0.45, float clim=0.081):
+        #rg/4.5 if rg<=0.081 else ((rg+0.099)/1.099)**(gamma)
         cdef:
-            int i, j, rmax, d 
-            int[::1] count, lut_r, lut_g, lut_b
-            float[::1] red, green, blue
-            float cr, cb, cg, rd, position, cp, fp, delta_low, delta_hi
+            float c, res 
+            int i
+        print("initialize the gamma LUT") 
+        LUT = numpy.empty(1 << 16, dtype=numpy.uint16)
+        for i in range(1 << 16):
+            c = i / 65535.0
+            if c < clim:
+                res = (i / slope) + 0.5
+            else:
+                res = 65535.0 * ((c + a) / (1.0 + a)) ** (gamma) + 0.5
+            LUT[i] = <numpy.uint16_t> res
+        return LUT
+
+    def calc_colors(self, flatfile, int nbits=14):
+        """Initalizes the tree colors LUTs, on 14 bits"""
+        cdef:
+            double[:, :] data
+            int i, j, dmax, d, scale, size
+            numpy.uint16_t[::1] lut_r, lut_g, lut_b, count
+            float cr, cb, cg, rd, position, cp, fp, delta_low, delta_hi, rmin, rmax, dr
+            float[::1] radius, sred, sblue, sgreen, red, green, blue
         print("initialize the color LUT")
-        rmax = int(ceil(max(self.radius)))
-        count = numpy.zeros(rmax + 1, dtype=numpy.int32)
-        lut_r = numpy.zeros(rmax + 1, dtype=numpy.int32)
-        lut_g = numpy.zeros(rmax + 1, dtype=numpy.int32)
-        lut_b = numpy.zeros(rmax + 1, dtype=numpy.int32)
-        red = numpy.zeros(rmax + 1, dtype=numpy.float32)
-        green = numpy.zeros(rmax + 1, dtype=numpy.float32)
-        blue = numpy.zeros(rmax + 1, dtype=numpy.float32)
-        for i in range(rmax):
-            for j in range(rmax):
+        data = numpy.loadtxt(flatfile)
+        radius = numpy.ascontiguousarray(data[:, 0], dtype=numpy.float32)
+        sred = numpy.ascontiguousarray(data[:, 1], dtype=numpy.float32)
+        sgreen = numpy.ascontiguousarray(data[:, 2], dtype=numpy.float32)
+        sblue = numpy.ascontiguousarray(data[:, 3], dtype=numpy.float32)
+
+        size = data.shape[0]
+        rmin = radius[0]
+        rmax = radius[size - 1]
+        dr = (rmax - rmin) / (size - 1)
+        
+        dmax = int(ceil(rmax))
+        count = numpy.zeros(dmax + 1, dtype=numpy.uint16)
+        lut_r = numpy.zeros(dmax + 1, dtype=numpy.uint16)
+        lut_g = numpy.zeros(dmax + 1, dtype=numpy.uint16)
+        lut_b = numpy.zeros(dmax + 1, dtype=numpy.uint16)
+        red = numpy.zeros(dmax + 1, dtype=numpy.float32)
+        green = numpy.zeros(dmax + 1, dtype=numpy.float32)
+        blue = numpy.zeros(dmax + 1, dtype=numpy.float32)
+        for i in range(dmax):
+            for j in range(dmax):
                 d = pseudo_dist(i, j)
-                if d > rmax:
+                if d > dmax:
                     continue
                 d = max(d, 0)
 
                 rd = sqrt(<float>(i * i + j * j))
-                if rd <= self.rmin:
-                    cr = self.red[0]
-                    cg = self.green[0] 
-                    cb = self.blue[0] 
-                elif rd >= self.rmax:
-                    cr = self.red[self.size - 1]
-                    cg = self.green[self.size - 1] 
-                    cb = self.blue[self.size - 1] 
+                if rd <= rmin:
+                    cr = sred[0]
+                    cg = sgreen[0] 
+                    cb = sblue[0] 
+                elif rd >= rmax:
+                    cr = sred[size - 1]
+                    cg = sgreen[size - 1] 
+                    cb = sblue[size - 1] 
                 else:
-                    position = (rd - self.rmin) / self.dr
+                    position = (rd - rmin) / dr
                     cp = ceil(position)
                     fp = floor(position)
                     if cp == fp:
-                        cr = self.red[<int> cp]
-                        cg = self.green[<int> cp] 
-                        cb = self.blue[<int> cp] 
+                        cr = sred[<int> cp]
+                        cg = sgreen[<int> cp] 
+                        cb = sblue[<int> cp] 
                     else: #Bilinear interpolation
                         delta_low = position - fp
                         delta_hi = cp - position
-                        cr = self.red[<int> fp] * delta_hi + self.red[<int> cp] * delta_low
-                        cg = self.green[<int> fp] * delta_hi + self.green[<int> cp] * delta_low
-                        cb = self.blue[<int> fp] * delta_hi + self.blue[<int> cp] * delta_low
+                        cr = sred[<int> fp] * delta_hi + sred[<int> cp] * delta_low
+                        cg = sgreen[<int> fp] * delta_hi + sgreen[<int> cp] * delta_low
+                        cb = sblue[<int> fp] * delta_hi + sblue[<int> cp] * delta_low
                 red[d] += cr
                 blue[d] += cb
                 green[d] += cg
                 count[d] += 1
-                
-        for i in range(rmax+1):
+        scale = (1 << nbits) - 1
+        for d in range(dmax + 1):
             if count[d] == 0:
                 continue
-            cr = red[d] * 4095.0 / count[d] + 0.5
-            cg = green[d] * 4095.0 / count[d] + 0.5
-            cb = blue[d] * 4095.0 / count[d] + 0.5
+            cr = red[d] * scale / count[d] + 0.5
+            cg = green[d] * scale / count[d] + 0.5
+            cb = blue[d] * scale / count[d] + 0.5
             
             lut_r[d] = <int> cr
             lut_g[d] = <int> cg
             lut_b[d] = <int> cb
         return lut_r, lut_g, lut_b
                 
-
-        
     def yuv420_to_rgb16(self, stream, resolution):
         """Convert a YUV420 linear stream into an image RGB
         array: 
@@ -416,9 +420,9 @@ cdef class Flatfield:
         :return: YUV array + historgram of Y,R,G,B
         """
         cdef:
-            int i, j, k, l, m, width, height, fwidth, fheight, ylen, uvlen, 
+            int i, j, k, l, m, width, height, fwidth, fheight, ylen, uvlen, d
             int y, u, v, r, g, b, half_width, half_height
-            float rd, cr, cg, cb, position, fp, cp, delta_hi, delta_low, rf, gf,bf
+            float rd, cr, cg, cb, position, fp, cp, delta_hi, delta_low, rf, gf, bf
             float yf, uf, vf, rg, gg, bg, gamma
             int ys, rv, gu, gv, bu
             numpy.uint8_t[::1] cstream = numpy.fromstring(stream, numpy.uint8)
@@ -510,38 +514,44 @@ cdef class Flatfield:
                     #gf = gg/4.5 if gg<=0.081 else ((gg+0.099)/1.099)**(gamma)
                     #bf = bg/4.5 if bg<=0.081 else ((bg+0.099)/1.099)**(gamma)
                     
-                    #Conversion to linear scale using a log scale
-                    r = self.LUT[r]
-                    g = self.LUT[g]
-                    b = self.LUT[b]
+#                     #Conversion to linear scale using a log scale
+#                     r = self.LUT[r]
+#                     g = self.LUT[g]
+#                     b = self.LUT[b]
+#                     
+#                     #Flatfield correction
+#                     rd = sqrt(<float>((i-half_height)**2 + (j-half_width)**2))
+#                     if rd <= self.rmin:
+#                         cr = self.red[0]
+#                         cg = self.green[0] 
+#                         cb = self.blue[0] 
+#                     elif rd >= self.rmax:
+#                         cr = self.red[self.size - 1]
+#                         cg = self.green[self.size - 1] 
+#                         cb = self.blue[self.size - 1] 
+#                     else:
+#                         position = (rd - self.rmin) / self.dr
+#                         cp = ceil(position)
+#                         fp = floor(position)
+#                         if cp == fp:
+#                             cr = self.red[<int>cp]
+#                             cg = self.green[<int>cp] 
+#                             cb = self.blue[<int>cp] 
+#                         else: #Bilinear interpolation
+#                             delta_low = position - fp
+#                             delta_hi = cp - position
+#                             cr = self.red[<int>fp]*delta_hi + self.red[<int>cp]*delta_low
+#                             cg = self.green[<int>fp]*delta_hi + self.green[<int>cp]*delta_low
+#                             cb = self.blue[<int>fp]*delta_hi + self.blue[<int>cp]*delta_low
+#                     r = <int>(r * cr + 0.5)
+#                     g = <int>(g * cg + 0.5)
+#                     b = <int>(b * cb + 0.5)
                     
-                    #Flatfield correction
-                    rd = sqrt(<float>((i-half_height)**2 + (j-half_width)**2))
-                    if rd <= self.rmin:
-                        cr = self.red[0]
-                        cg = self.green[0] 
-                        cb = self.blue[0] 
-                    elif rd >= self.rmax:
-                        cr = self.red[self.size - 1]
-                        cg = self.green[self.size - 1] 
-                        cb = self.blue[self.size - 1] 
-                    else:
-                        position = (rd - self.rmin) / self.dr
-                        cp = ceil(position)
-                        fp = floor(position)
-                        if cp == fp:
-                            cr = self.red[<int>cp]
-                            cg = self.green[<int>cp] 
-                            cb = self.blue[<int>cp] 
-                        else: #Bilinear interpolation
-                            delta_low = position - fp
-                            delta_hi = cp - position
-                            cr = self.red[<int>fp]*delta_hi + self.red[<int>cp]*delta_low
-                            cg = self.green[<int>fp]*delta_hi + self.green[<int>cp]*delta_low
-                            cb = self.blue[<int>fp]*delta_hi + self.blue[<int>cp]*delta_low
-                    r = <int>(r * cr + 0.5)
-                    g = <int>(g * cg + 0.5)
-                    b = <int>(b * cb + 0.5)
+                    #Flatfield correction using LUT table
+                    d = pseudo_dist((i - half_height), (j - half_width))
+                    r = (self.LUT[r] * self.lut_r[d] + (1<<(self.nbits-1))) >> self.nbits
+                    g = (self.LUT[g] * self.lut_g[d] + (1<<(self.nbits-1))) >> self.nbits
+                    b = (self.LUT[b] * self.lut_b[d] + (1<<(self.nbits-1))) >> self.nbits
                     
                     #Conversion to gamma scale
                     #rg = rf*4.5 if rf<=0.018 else (rf**0.45)*1.099 - 0.099
