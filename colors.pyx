@@ -37,7 +37,7 @@ def yuv420_to_yuv(stream, resolution):
     cdef:
         int i, j, k, l, m, width, height, fwidth, fheight, ylen, uvlen, y
         numpy.uint8_t[::1] cstream = numpy.fromstring(stream, numpy.uint8)
-        numpy.uint8_t[:,:,::1] yuv
+        numpy.uint8_t[:, :, ::1] yuv
         int[::1] histo
     
     histo = numpy.zeros(256, dtype=numpy.int32)
@@ -288,9 +288,9 @@ cdef class SRGB:
             for i in range(height):
                 for j in range(width):
                     for k in range(3):
-                        r = im1[i,j,k] + im2[i,j,k]
+                        r = im1[i, j, k] + im2[i, j, k]
                         if r > 65535: 
-                            overflow=True
+                            overflow = True
                             out[i, j, k] = 65535
                         else:
                             out[i, j, k] = r
@@ -320,13 +320,13 @@ cdef class Flatfield:
             #rg/4.5 if rg<=0.081 else ((rg+0.099)/1.099)**(gamma)
             float c, a=0.099, res, slope=4.5, gamma=1.0/0.45
             int i 
-        self.LUT = numpy.empty(1<<16, dtype=numpy.uint16)
-        for i in range(1<<16):
+        self.LUT = numpy.empty(1 << 16, dtype=numpy.uint16)
+        for i in range(1 << 16):
             c = <float>i / 65535.
             if c < 0.081:
-                res = (i/slope) + 0.5
+                res = (i / slope) + 0.5
             else:
-                res = 65535 * ((c+a)/(1+a))**(gamma) + 0.5
+                res = 65535 * ((c + a)/(1.0 + a))**(gamma) + 0.5
             self.LUT[i] = <int> res
         self.lut_r, self.lut_g, self.lut_b = self.calc_colors()
 
@@ -345,16 +345,16 @@ cdef class Flatfield:
             int i, j, rmax, d 
             int[::1] count, lut_r, lut_g, lut_b
             float[::1] red, green, blue
-            float cr, cb, cg, rd, position, cp, fp
+            float cr, cb, cg, rd, position, cp, fp, delta_low, delta_hi
         print("initialize the color LUT")
         rmax = int(ceil(max(self.radius)))
-        count = numpy.zeros(rmax+1, dtype=numpy.int32)
-        lut_r = numpy.zeros(rmax+1, dtype=numpy.int32)
-        lut_g = numpy.zeros(rmax+1, dtype=numpy.int32)
-        lut_b = numpy.zeros(rmax+1, dtype=numpy.int32)
-        red = numpy.zeros(rmax+1, dtype=numpy.float32)
-        green = numpy.zeros(rmax+1, dtype=numpy.float32)
-        blue = numpy.zeros(rmax+1, dtype=numpy.float32)
+        count = numpy.zeros(rmax + 1, dtype=numpy.int32)
+        lut_r = numpy.zeros(rmax + 1, dtype=numpy.int32)
+        lut_g = numpy.zeros(rmax + 1, dtype=numpy.int32)
+        lut_b = numpy.zeros(rmax + 1, dtype=numpy.int32)
+        red = numpy.zeros(rmax + 1, dtype=numpy.float32)
+        green = numpy.zeros(rmax + 1, dtype=numpy.float32)
+        blue = numpy.zeros(rmax + 1, dtype=numpy.float32)
         for i in range(rmax):
             for j in range(rmax):
                 d = pseudo_dist(i, j)
@@ -362,7 +362,7 @@ cdef class Flatfield:
                     continue
                 d = max(d, 0)
 
-                rd = sqrt(<float>(i*i + j*j))
+                rd = sqrt(<float>(i * i + j * j))
                 if rd <= self.rmin:
                     cr = self.red[0]
                     cg = self.green[0] 
@@ -376,15 +376,15 @@ cdef class Flatfield:
                     cp = ceil(position)
                     fp = floor(position)
                     if cp == fp:
-                        cr = self.red[<int>cp]
-                        cg = self.green[<int>cp] 
-                        cb = self.blue[<int>cp] 
+                        cr = self.red[<int> cp]
+                        cg = self.green[<int> cp] 
+                        cb = self.blue[<int> cp] 
                     else: #Bilinear interpolation
                         delta_low = position - fp
                         delta_hi = cp - position
-                        cr = self.red[<int>fp]*delta_hi + self.red[<int>cp]*delta_low
-                        cg = self.green[<int>fp]*delta_hi + self.green[<int>cp]*delta_low
-                        cb = self.blue[<int>fp]*delta_hi + self.blue[<int>cp]*delta_low
+                        cr = self.red[<int> fp] * delta_hi + self.red[<int> cp] * delta_low
+                        cg = self.green[<int> fp] * delta_hi + self.green[<int> cp] * delta_low
+                        cb = self.blue[<int> fp] * delta_hi + self.blue[<int> cp] * delta_low
                 red[d] += cr
                 blue[d] += cb
                 green[d] += cg
@@ -393,7 +393,7 @@ cdef class Flatfield:
         for i in range(rmax+1):
             if count[d] == 0:
                 continue
-            cr = red[d]  * 4095.0 / count[d] + 0.5
+            cr = red[d] * 4095.0 / count[d] + 0.5
             cg = green[d] * 4095.0 / count[d] + 0.5
             cb = blue[d] * 4095.0 / count[d] + 0.5
             
