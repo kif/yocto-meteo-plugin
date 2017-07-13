@@ -298,8 +298,8 @@ cdef class SRGB:
         
 cdef class Flatfield:
     cdef: 
-        float[::1] radius, red, green, blue
-        int[::1] lut_r, lut_g, lut_b 
+        readonly float[::1] radius, red, green, blue
+        readonly  int[::1] lut_r, lut_g, lut_b 
         readonly numpy.uint16_t[::1] LUT
         float rmin, rmax, dr
         int size

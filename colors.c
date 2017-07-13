@@ -1039,7 +1039,7 @@ struct __pyx_obj_6colors_SRGB {
  * 
  * cdef class Flatfield:             # <<<<<<<<<<<<<<
  *     cdef:
- *         float[::1] radius, red, green, blue
+ *         readonly float[::1] radius, red, green, blue
  */
 struct __pyx_obj_6colors_Flatfield {
   PyObject_HEAD
@@ -2293,6 +2293,13 @@ static void __pyx_pf_6colors_9Flatfield_2__dealloc__(struct __pyx_obj_6colors_Fl
 static PyObject *__pyx_pf_6colors_9Flatfield_4calc_colors(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_6colors_9Flatfield_6yuv420_to_rgb16(struct __pyx_obj_6colors_Flatfield *__pyx_v_self, PyObject *__pyx_v_stream, PyObject *__pyx_v_resolution); /* proto */
 static PyObject *__pyx_pf_6colors_9Flatfield_8yuv420_to_yuv(CYTHON_UNUSED struct __pyx_obj_6colors_Flatfield *__pyx_v_self, PyObject *__pyx_v_stream, PyObject *__pyx_v_resolution); /* proto */
+static PyObject *__pyx_pf_6colors_9Flatfield_6radius___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_6colors_9Flatfield_3red___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_6colors_9Flatfield_5green___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_6colors_9Flatfield_4blue___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_6colors_9Flatfield_5lut_r___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_6colors_9Flatfield_5lut_g___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_6colors_9Flatfield_5lut_b___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_6colors_9Flatfield_3LUT___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self); /* proto */
 static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info); /* proto */
@@ -9975,9 +9982,277 @@ static PyObject *__pyx_pf_6colors_9Flatfield_8yuv420_to_yuv(CYTHON_UNUSED struct
   return __pyx_r;
 }
 
+/* "colors.pyx":301
+ * cdef class Flatfield:
+ *     cdef:
+ *         readonly float[::1] radius, red, green, blue             # <<<<<<<<<<<<<<
+ *         readonly  int[::1] lut_r, lut_g, lut_b
+ *         readonly numpy.uint16_t[::1] LUT
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_6colors_9Flatfield_6radius_1__get__(PyObject *__pyx_v_self); /*proto*/
+static PyObject *__pyx_pw_6colors_9Flatfield_6radius_1__get__(PyObject *__pyx_v_self) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__get__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_6colors_9Flatfield_6radius___get__(((struct __pyx_obj_6colors_Flatfield *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_6colors_9Flatfield_6radius___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  __Pyx_RefNannySetupContext("__get__", 0);
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_v_self->radius, 1, (PyObject *(*)(char *)) __pyx_memview_get_float, (int (*)(char *, PyObject *)) __pyx_memview_set_float, 0);; if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 301, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("colors.Flatfield.radius.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* Python wrapper */
+static PyObject *__pyx_pw_6colors_9Flatfield_3red_1__get__(PyObject *__pyx_v_self); /*proto*/
+static PyObject *__pyx_pw_6colors_9Flatfield_3red_1__get__(PyObject *__pyx_v_self) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__get__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_6colors_9Flatfield_3red___get__(((struct __pyx_obj_6colors_Flatfield *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_6colors_9Flatfield_3red___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  __Pyx_RefNannySetupContext("__get__", 0);
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_v_self->red, 1, (PyObject *(*)(char *)) __pyx_memview_get_float, (int (*)(char *, PyObject *)) __pyx_memview_set_float, 0);; if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 301, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("colors.Flatfield.red.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* Python wrapper */
+static PyObject *__pyx_pw_6colors_9Flatfield_5green_1__get__(PyObject *__pyx_v_self); /*proto*/
+static PyObject *__pyx_pw_6colors_9Flatfield_5green_1__get__(PyObject *__pyx_v_self) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__get__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_6colors_9Flatfield_5green___get__(((struct __pyx_obj_6colors_Flatfield *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_6colors_9Flatfield_5green___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  __Pyx_RefNannySetupContext("__get__", 0);
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_v_self->green, 1, (PyObject *(*)(char *)) __pyx_memview_get_float, (int (*)(char *, PyObject *)) __pyx_memview_set_float, 0);; if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 301, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("colors.Flatfield.green.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* Python wrapper */
+static PyObject *__pyx_pw_6colors_9Flatfield_4blue_1__get__(PyObject *__pyx_v_self); /*proto*/
+static PyObject *__pyx_pw_6colors_9Flatfield_4blue_1__get__(PyObject *__pyx_v_self) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__get__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_6colors_9Flatfield_4blue___get__(((struct __pyx_obj_6colors_Flatfield *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_6colors_9Flatfield_4blue___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  __Pyx_RefNannySetupContext("__get__", 0);
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_v_self->blue, 1, (PyObject *(*)(char *)) __pyx_memview_get_float, (int (*)(char *, PyObject *)) __pyx_memview_set_float, 0);; if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 301, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("colors.Flatfield.blue.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "colors.pyx":302
+ *     cdef:
+ *         readonly float[::1] radius, red, green, blue
+ *         readonly  int[::1] lut_r, lut_g, lut_b             # <<<<<<<<<<<<<<
+ *         readonly numpy.uint16_t[::1] LUT
+ *         float rmin, rmax, dr
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_6colors_9Flatfield_5lut_r_1__get__(PyObject *__pyx_v_self); /*proto*/
+static PyObject *__pyx_pw_6colors_9Flatfield_5lut_r_1__get__(PyObject *__pyx_v_self) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__get__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_6colors_9Flatfield_5lut_r___get__(((struct __pyx_obj_6colors_Flatfield *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_6colors_9Flatfield_5lut_r___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  __Pyx_RefNannySetupContext("__get__", 0);
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_v_self->lut_r, 1, (PyObject *(*)(char *)) __pyx_memview_get_int, (int (*)(char *, PyObject *)) __pyx_memview_set_int, 0);; if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 302, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("colors.Flatfield.lut_r.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* Python wrapper */
+static PyObject *__pyx_pw_6colors_9Flatfield_5lut_g_1__get__(PyObject *__pyx_v_self); /*proto*/
+static PyObject *__pyx_pw_6colors_9Flatfield_5lut_g_1__get__(PyObject *__pyx_v_self) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__get__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_6colors_9Flatfield_5lut_g___get__(((struct __pyx_obj_6colors_Flatfield *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_6colors_9Flatfield_5lut_g___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  __Pyx_RefNannySetupContext("__get__", 0);
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_v_self->lut_g, 1, (PyObject *(*)(char *)) __pyx_memview_get_int, (int (*)(char *, PyObject *)) __pyx_memview_set_int, 0);; if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 302, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("colors.Flatfield.lut_g.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* Python wrapper */
+static PyObject *__pyx_pw_6colors_9Flatfield_5lut_b_1__get__(PyObject *__pyx_v_self); /*proto*/
+static PyObject *__pyx_pw_6colors_9Flatfield_5lut_b_1__get__(PyObject *__pyx_v_self) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__get__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_6colors_9Flatfield_5lut_b___get__(((struct __pyx_obj_6colors_Flatfield *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_6colors_9Flatfield_5lut_b___get__(struct __pyx_obj_6colors_Flatfield *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  __Pyx_RefNannySetupContext("__get__", 0);
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_v_self->lut_b, 1, (PyObject *(*)(char *)) __pyx_memview_get_int, (int (*)(char *, PyObject *)) __pyx_memview_set_int, 0);; if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 302, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("colors.Flatfield.lut_b.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
 /* "colors.pyx":303
- *         float[::1] radius, red, green, blue
- *         int[::1] lut_r, lut_g, lut_b
+ *         readonly float[::1] radius, red, green, blue
+ *         readonly  int[::1] lut_r, lut_g, lut_b
  *         readonly numpy.uint16_t[::1] LUT             # <<<<<<<<<<<<<<
  *         float rmin, rmax, dr
  *         int size
@@ -24359,6 +24634,34 @@ static void __pyx_tp_dealloc_6colors_Flatfield(PyObject *o) {
   (*Py_TYPE(o)->tp_free)(o);
 }
 
+static PyObject *__pyx_getprop_6colors_9Flatfield_radius(PyObject *o, CYTHON_UNUSED void *x) {
+  return __pyx_pw_6colors_9Flatfield_6radius_1__get__(o);
+}
+
+static PyObject *__pyx_getprop_6colors_9Flatfield_red(PyObject *o, CYTHON_UNUSED void *x) {
+  return __pyx_pw_6colors_9Flatfield_3red_1__get__(o);
+}
+
+static PyObject *__pyx_getprop_6colors_9Flatfield_green(PyObject *o, CYTHON_UNUSED void *x) {
+  return __pyx_pw_6colors_9Flatfield_5green_1__get__(o);
+}
+
+static PyObject *__pyx_getprop_6colors_9Flatfield_blue(PyObject *o, CYTHON_UNUSED void *x) {
+  return __pyx_pw_6colors_9Flatfield_4blue_1__get__(o);
+}
+
+static PyObject *__pyx_getprop_6colors_9Flatfield_lut_r(PyObject *o, CYTHON_UNUSED void *x) {
+  return __pyx_pw_6colors_9Flatfield_5lut_r_1__get__(o);
+}
+
+static PyObject *__pyx_getprop_6colors_9Flatfield_lut_g(PyObject *o, CYTHON_UNUSED void *x) {
+  return __pyx_pw_6colors_9Flatfield_5lut_g_1__get__(o);
+}
+
+static PyObject *__pyx_getprop_6colors_9Flatfield_lut_b(PyObject *o, CYTHON_UNUSED void *x) {
+  return __pyx_pw_6colors_9Flatfield_5lut_b_1__get__(o);
+}
+
 static PyObject *__pyx_getprop_6colors_9Flatfield_LUT(PyObject *o, CYTHON_UNUSED void *x) {
   return __pyx_pw_6colors_9Flatfield_3LUT_1__get__(o);
 }
@@ -24371,6 +24674,13 @@ static PyMethodDef __pyx_methods_6colors_Flatfield[] = {
 };
 
 static struct PyGetSetDef __pyx_getsets_6colors_Flatfield[] = {
+  {(char *)"radius", __pyx_getprop_6colors_9Flatfield_radius, 0, (char *)0, 0},
+  {(char *)"red", __pyx_getprop_6colors_9Flatfield_red, 0, (char *)0, 0},
+  {(char *)"green", __pyx_getprop_6colors_9Flatfield_green, 0, (char *)0, 0},
+  {(char *)"blue", __pyx_getprop_6colors_9Flatfield_blue, 0, (char *)0, 0},
+  {(char *)"lut_r", __pyx_getprop_6colors_9Flatfield_lut_r, 0, (char *)0, 0},
+  {(char *)"lut_g", __pyx_getprop_6colors_9Flatfield_lut_g, 0, (char *)0, 0},
+  {(char *)"lut_b", __pyx_getprop_6colors_9Flatfield_lut_b, 0, (char *)0, 0},
   {(char *)"LUT", __pyx_getprop_6colors_9Flatfield_LUT, 0, (char *)0, 0},
   {0, 0, 0, 0, 0}
 };
