@@ -301,10 +301,15 @@ cdef class Flatfield:
         readonly  numpy.uint16_t[::1] lut_r, lut_g, lut_b, LUT 
         int nbits
         
-    def __cinit__(self, flatfile, nbits=14):
+    def __cinit__(self, flatfile=None, nbits=14):
         self.nbits = nbits
         self.LUT = self.calc_gamma()
-        self.lut_r, self.lut_g, self.lut_b = self.calc_colors(flatfile, nbits=self.nbits)      
+        if flatfile is None:
+            self.lut_r = None
+            self.lut_g = None
+            self.lut_b = None
+        else:
+            self.lut_r, self.lut_g, self.lut_b = self.calc_colors(flatfile, nbits=self.nbits)      
 
     def __dealloc__(self):
         #self.radius = None
@@ -513,6 +518,18 @@ cdef class Flatfield:
                     #rf = rg/4.5 if rg<=0.081 else ((rg+0.099)/1.099)**(gamma)
                     #gf = gg/4.5 if gg<=0.081 else ((gg+0.099)/1.099)**(gamma)
                     #bf = bg/4.5 if bg<=0.081 else ((bg+0.099)/1.099)**(gamma)
+
+                    #Flatfield correction using LUT table
+#                     #Conversion to linear scale using a log scale
+                    if self.lut_r is None:
+                        r = self.LUT[r]
+                        g = self.LUT[g]
+                        b = self.LUT[b]
+                    else:
+                        d = pseudo_dist((i - half_height), (j - half_width))
+                        r = (self.LUT[r] * self.lut_r[d] + (1 << (self.nbits - 1))) >> self.nbits
+                        g = (self.LUT[g] * self.lut_g[d] + (1 << (self.nbits - 1))) >> self.nbits
+                        b = (self.LUT[b] * self.lut_b[d] + (1 << (self.nbits - 1))) >> self.nbits
                     
 #                     #Conversion to linear scale using a log scale
 #                     r = self.LUT[r]
@@ -547,18 +564,13 @@ cdef class Flatfield:
 #                     g = <int>(g * cg + 0.5)
 #                     b = <int>(b * cb + 0.5)
                     
-                    #Flatfield correction using LUT table
-                    d = pseudo_dist((i - half_height), (j - half_width))
-                    r = (self.LUT[r] * self.lut_r[d] + (1<<(self.nbits-1))) >> self.nbits
-                    g = (self.LUT[g] * self.lut_g[d] + (1<<(self.nbits-1))) >> self.nbits
-                    b = (self.LUT[b] * self.lut_b[d] + (1<<(self.nbits-1))) >> self.nbits
                     
                     #Conversion to gamma scale
                     #rg = rf*4.5 if rf<=0.018 else (rf**0.45)*1.099 - 0.099
                     #gg = gf*4.5 if gf<=0.018 else (gf**0.45)*1.099 - 0.099
                     #bg = bf*4.5 if bf<=0.018 else (bf**0.45)*1.099 - 0.099
                     
-                    #Normalization
+                    #cliping
                     r = 0 if r<0 else (65535 if r>65535 else r)
                     g = 0 if g<0 else (65535 if g>65535 else g)
                     b = 0 if b<0 else (65535 if b>65535 else b)
