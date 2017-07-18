@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import division, print_function
 import os
+from math import log
 from collections import namedtuple, OrderedDict, deque
 import time
 import threading
@@ -29,7 +30,7 @@ except ImportError:
 else:
     colors = _colors.Flatfield("flatfield.txt")
     sRGB = _colors.SRGB()
-ExpoRedBlue = namedtuple("ExpoRedBlue", ("ev", "dev", "over", "red", "green", "blue"))
+ExpoRedBlue = namedtuple("ExpoRedBlue", ("ev", "red", "blue"))
 GainRedBlue = namedtuple("GainRedBlue", ("red", "blue"))
 
 class SavGol(object):
@@ -54,7 +55,8 @@ class SavGol(object):
         return numpy.dot(lst, self.cache[l])
 
 
-savgol = SavGol(0)
+savgol0 = SavGol(0)
+savgol1 = SavGol(1)
 
 
 class Frame(object):
@@ -329,7 +331,7 @@ class Camera(threading.Thread):
     def run(self):
         "main thread activity"
         self.camera.awb_mode = "off" # "auto"
-        self.camera.exposure_mode = "night" #"auto"
+        self.camera.exposure_mode = "off" #night" #"auto"
         self._done_recording.clear()
         for foo in self.camera.capture_continuous(self.stream, format='yuv'):
             self._done_recording.set()
@@ -350,8 +352,9 @@ class Camera(threading.Thread):
                     if evrb.red:
                         self.wb_red.append(evrb.red)
                         self.wb_blue.append(evrb.blue)
-                    self.config_queue.task_done()
-            #        self.histo_ev.append(evrb.ev)
+                    if evrb.ev:
+                        self.histo_ev.append(evrb.ev)
+                self.config_queue.task_done()
                 self.update_expo()    
             self._can_record.wait()
             self._done_recording.clear()
@@ -367,24 +370,29 @@ class Camera(threading.Thread):
         if len(self.wb_red) > self.avg_wb:
             self.wb_red = self.wb_red[-self.avg_wb:]
             self.wb_blue = self.wb_blue[-self.avg_wb:]
-#        if len(self.histo_ev) > self.avg_ev:
-#            self.histo_ev = self.histo_ev[-self.avg_ev:]
-        self.camera.awb_gains = (savgol(self.wb_red),
-                                 savgol(self.wb_blue))
-#        ev = savgol(self.histo_ev)
-#        speed = lens.calc_speed(ev)
-#        if speed > self.framerate:
-#            camera.shutter_speed = int(1000000. / self.framerate / speed)
-#            camera.iso = 100
-#        elif speed > self.framerate * 2:
-#            camera.shutter_speed = int(2000000. / self.framerate / speed)
-#            camera.iso = 200
-#        elif speed > self.framerate * 4:
-#            camera.shutter_speed = int(4000000. / self.framerate / speed)
-#            camera.iso = 400
-#        else:
-#            camera.shutter_speed = min(int(8000000. / self.framerate / speed), 1000000)
-#            camera.iso = 800       
+        if len(self.histo_ev) > self.avg_ev:
+            self.histo_ev = self.histo_ev[-self.avg_ev:]
+        self.camera.awb_gains = (savgol0(self.wb_red),
+                                 savgol0(self.wb_blue))
+        ev = savgol1(self.histo_ev)
+        speed = lens.calc_speed(ev)
+        #if self.camera.revision == "imx219":
+        #    speed *= 1.84
+        framerate = float(self.camera.framerate)
+        logger.info("Update speed: %s %s",speed,framerate)
+        
+        if speed > framerate:
+            self.camera.shutter_speed = int(1000000. / framerate / speed)
+            self.camera.iso = 100
+        elif speed > framerate * 2:
+            self.camera.shutter_speed = int(2000000. / framerate / speed)
+            self.camera.iso = 200
+        elif speed > framerate * 4:
+            self.camera.shutter_speed = int(4000000. / framerate / speed)
+            self.camera.iso = 400
+        else:
+            self.camera.shutter_speed = min(int(8000000. / framerate / speed), int(1000000/framerate))
+            self.camera.iso = 800       
 #        #TODO: how to change framerate ? maybe start with low
         
 
@@ -478,47 +486,65 @@ class Analyzer(threading.Thread):
         while not self.quit_event.is_set():
             frame = self.queue.get()
             t0 = time.time()
-            if 0: #for exposure calculation:
-                ev = lens.calc_EV(1000000/frame.camera_meta.get("exposure_speed", 1))
-                yprime = frame.yuv[:, :, 0]
-                cnt = numpy.bincount(yprime, minlength=256)
-                cs = numpy.zeros(257, int)
-                cs[1:] = numpy.cumsum(cnt)
-                dev = cs[self.ukr[1:]]-cs[self.ukr[:-1]]
-                cnv = convolve(dev, self.g19_2, mode="same")
-                idx = cnv.argmax()
-                dev = self.delta_expo[idx]
-                hess = (cnv[idx + 1] + cnv[idx - 1] - 2 * cnv[idx])
-                if hess:
-                   dev -= 0.5 * (cnv[idx + 1] - cnv[idx - 1]) / hess
-            #Calculation of the corrected white-balance
+            ev = oldev = lens.calc_EV(1000000/frame.camera_meta.get("exposure_speed", 1), iso=frame.camera_meta.get("iso_calc",100))
             histo = frame.histograms
-            csr = numpy.cumsum(histo[1])
-            csg = numpy.cumsum(histo[2])
-            csb = numpy.cumsum(histo[3])
-            
-            pos = csr[-1] * (1.0 - target_rgb)
-            try:
-                pos_r = numpy.where(csr >= pos)[0][0]
-                pos_g = numpy.where(csg >= pos)[0][0]
-                pos_b = numpy.where(csb >= pos)[0][0]
-            except IndexError as e:
-                logger.error("no awb %s, exposure to low ",e)
-                #self.queue.task_done()
-                #continue
-                pos_r = numpy.where(histo[1])[0][-1]
-                pos_g = numpy.where(histo[2])[0][-1]
-                pos_b = numpy.where(histo[3])[0][-1]
-            rg, bg = frame.camera_meta.get("awb_gains", (1.0, 1.0))
-            if rg == 0.0: 
-                rg = 1.0
-            if bg == 0.0: 
-                bg = 1.0
-            try:
-                awb = GainRedBlue(min(8,1.0 * rg * pos_g / pos_r), min(8,1.0 * bg * pos_g / pos_b))
-            except ZeroDivisionError:
-                awb = GainRedBlue(rg, bg)
+            if 1: #for exposure calculation:
+                ylin = histo[0]
+                ymax = numpy.where(ylin)[0][-1]
+                #logger.info("ymax: %s", ymax)
+                if ymax>1000: 
+                    logger.debug("exposition %s is correct to over %s", ev, ymax)
+                    cs = ylin.cumsum()
+                    lim = 16
+                    lo_light = cs[lim-1]
+                    hi_light = cs[-1] - cs[-lim]
+                    if hi_light > lo_light: #over exposed
+                        if lo_light == 0:
+                            ev += 1 
+                        else:
+                            log(1.0 * hi_light/lo_light, 2)
+                        logger.info("image is over-exposed, let's shrink %s %s eV: %s->%s", lo_light, hi_light, oldev, ev)
+                else: 
+                    ev += log(1.0 * ymax / ylin.size, 2)
+                    logger.info("image is under exposed, let's boost it %s eV: %s->%s", ymax, oldev, ev)
+            if 1: #Calculation of the corrected white-balance
+                csr = numpy.cumsum(histo[1])
+                csg = numpy.cumsum(histo[2])
+                csb = numpy.cumsum(histo[3])
+                if (csr[-1] != csg[-1]) or (csg[-1] != csb[-1]):
+                    logger.error("Different number of pixel in chanels R, G and B: %s", histo.sum(axis=-1))
+                pos = csr[-1] * (1.0 - target_rgb)
+                try:
+                    pos_r = numpy.where(csr >= pos)[0][0]
+                    pos_g = numpy.where(csg >= pos)[0][0]
+                    pos_b = numpy.where(csb >= pos)[0][0]
+                except IndexError as e:
+                    logger.error("no awb %s, exposure to low ",e)
+                    #self.queue.task_done()
+                    #continue
+                    pos_r = numpy.where(histo[1])[0][-1]
+                    pos_g = numpy.where(histo[2])[0][-1]
+                    pos_b = numpy.where(histo[3])[0][-1]
+                rg, bg = frame.camera_meta.get("awb_gains", (1.0, 1.0))
+                if rg == 0.0: 
+                    rg = 1.0
+                if bg == 0.0: 
+                    bg = 1.0
+                try:
+                    red_gain =  1.0 * rg * pos_g / pos_r
+                    blue_gain = 1.0 * bg * pos_g / pos_b
+                    logger.info("Update Red: %s -> %s Blue %s -> %s r%s g%s b%s", rg, red_gain, bg, blue_gain, pos_r, pos_g, pos_b)
+                    #awb = GainRedBlue(min(8, max(0.125, red_gain)), min(8, max(0.125, blue_gain)))
+                except ZeroDivisionError:
+                    logger.error("pos_r %s, pos_g %s, pos_b %s, rg %s, bg %s", pos_r, pos_g, pos_b, rg, bg)
+                    red_gain = rg
+                    blue_gain = bg
+                    #awb = GainRedBlue(rg, bg)
+            else:
+                red_gain = None
+                blue_gain = None
             now = time.time()
+            awb = ExpoRedBlue(ev, min(8, max(0.125, red_gain)), min(8, max(0.125, blue_gain)))
             self.output_queue.put(awb)
             self.queue.task_done()
             logger.info("Analysis of frame #%i took: %.3fs, delay since acquisition: %.3fs", frame.index, now-t0, now-frame.timestamp)

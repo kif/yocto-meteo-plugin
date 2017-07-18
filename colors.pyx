@@ -434,7 +434,7 @@ cdef class Flatfield:
             numpy.uint16_t[:,:,::1] rgb
             int[:, ::1] histo
         
-        histo = numpy.zeros((4, 256), dtype=numpy.int32)
+        histo = numpy.zeros((4, 1024), dtype=numpy.int32)
         
         #Coef for Y'UV -> R'G'B'
         #ys = 65535 / (235-16) #1.164
@@ -469,13 +469,14 @@ cdef class Flatfield:
                     y = cstream[k + j]
                     u = cstream[ylen + l + m]
                     v =cstream[ylen + uvlen + l + m]
-                    histo[0, y] += 1
+                    #histo[0, y] += 1
                     y -= 16
 #                    y=0 if y<0 else (219 if y>219 else y)
                     if y < 0: #Saturated black
                         rgb[i, j, 0] = 0
                         rgb[i, j, 1] = 0
                         rgb[i, j, 2] = 0
+                        histo[0, 0] += 1
                         histo[1, 0] += 1
                         histo[2, 0] += 1
                         histo[3, 0] += 1
@@ -484,9 +485,10 @@ cdef class Flatfield:
                         rgb[i, j, 0] = 65535
                         rgb[i, j, 1] = 65535
                         rgb[i, j, 2] = 65535
-                        histo[1, 255] += 1
-                        histo[2, 255] += 1
-                        histo[3, 255] += 1
+                        histo[0, 1023] += 1
+                        histo[1, 1023] += 1
+                        histo[2, 1023] += 1
+                        histo[3, 1023] += 1
                         continue
 
                     u -= 128
@@ -511,9 +513,10 @@ cdef class Flatfield:
                     g = 0 if g<0 else (65535 if g>65535 else g)
                     b = 0 if b<0 else (65535 if b>65535 else b)
 
-                    histo[1, (r + (1<<7)) >> 8] += 1
-                    histo[2, (g + (1<<7)) >> 8] += 1
-                    histo[3, (b + (1<<7)) >> 8] += 1
+                    # switch to 10 bits colors histograms
+                    #histo[1, (r + (1<<7)) >> 8] += 1
+                    #histo[2, (g + (1<<7)) >> 8] += 1
+                    #histo[3, (b + (1<<7)) >> 8] += 1
                     
                     #Conversion to linear scale: faster done with LUT
                     #rf = rg/4.5 if rg<=0.081 else ((rg+0.099)/1.099)**(gamma)
@@ -579,6 +582,13 @@ cdef class Flatfield:
                     rgb[i, j, 0] = r
                     rgb[i, j, 1] = g
                     rgb[i, j, 2] = b
+                    
+                    #10 bits RGB histogram
+                    histo[0, self.LUT[y] >> 6] += 1
+                    histo[1, r >> 6] += 1
+                    histo[2, g >> 6] += 1
+                    histo[3, b >> 6] += 1
+
                     
         return numpy.asarray(rgb), numpy.asarray(histo)
 
