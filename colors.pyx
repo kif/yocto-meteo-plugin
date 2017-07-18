@@ -358,7 +358,7 @@ cdef class Flatfield:
         rmax = radius[size - 1]
         dr = (rmax - rmin) / (size - 1)
         
-        dmax = int(ceil(rmax))
+        dmax = int(ceil(rmax)) + 10
         count = numpy.zeros(dmax + 1, dtype=numpy.uint16)
         lut_r = numpy.zeros(dmax + 1, dtype=numpy.uint16)
         lut_g = numpy.zeros(dmax + 1, dtype=numpy.uint16)
@@ -426,7 +426,7 @@ cdef class Flatfield:
         """
         cdef:
             int i, j, k, l, m, width, height, fwidth, fheight, ylen, uvlen, d
-            int y, u, v, r, g, b, half_width, half_height
+            int y, u, v, r, g, b, half_width, half_height, dmax
             float rd, cr, cg, cb, position, fp, cp, delta_hi, delta_low, rf, gf, bf
             float yf, uf, vf, rg, gg, bg, gamma
             int ys, rv, gu, gv, bu
@@ -459,6 +459,7 @@ cdef class Flatfield:
         uvlen = ylen // 4
         assert cstream.size >= (ylen + 2 * uvlen), "stream is len enough"
         rgb = numpy.empty((height, width, 3), dtype=numpy.uint16)
+        dmax = self.lut_r.size
         with nogil:
             for i in range(height):
                 k = fwidth * i
@@ -526,7 +527,7 @@ cdef class Flatfield:
                         g = self.LUT[g]
                         b = self.LUT[b]
                     else:
-                        d = pseudo_dist((i - half_height), (j - half_width))
+                        d = min(dmax-1, pseudo_dist((i - half_height), (j - half_width)))
                         r = (self.LUT[r] * self.lut_r[d] + (1 << (self.nbits - 1))) >> self.nbits
                         g = (self.LUT[g] * self.lut_g[d] + (1 << (self.nbits - 1))) >> self.nbits
                         b = (self.LUT[b] * self.lut_b[d] + (1 << (self.nbits - 1))) >> self.nbits

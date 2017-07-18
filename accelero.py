@@ -38,7 +38,7 @@ class Accelerometer(Thread):
             finally:
                 self._done_recording.set()
 
-    def quit(self):
+    def quit(self, *arg, **kwarg):
         "quit the main loop and end the thread"
         self._quit.set()
 

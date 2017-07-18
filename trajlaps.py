@@ -287,7 +287,7 @@ class TimeLaps(threading.Thread):
                             self.config_queue.qsize()
                             )
             if frame.index % 100 == 0:
-                self.save()
+                self.save_config(frame.index)
                                
 
 if __name__ == "__main__":

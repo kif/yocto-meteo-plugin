@@ -267,14 +267,14 @@ class Camera(threading.Thread):
 
     
     def get_config(self):
-        config = OrderedDict(("resolution", tuple(self.camera.resolution)),
-                             ("framerate", float(self.camera.framerate)),
-                             ("sensor_mode", self.camera.sensor_mode),
-                             ("avg_ev", self.avg_ev),
-                             ("avg_wb", self.avg_wb),
-                             ("hist_ev", self.histo_ev),
-                             ("wb_red", self.wb_red),
-                             ("wb_blue", self.wb_blue))
+        config = OrderedDict([("resolution", tuple(self.camera.resolution)),
+                              ("framerate", float(self.camera.framerate)),
+                              ("sensor_mode", self.camera.sensor_mode),
+                              ("avg_ev", self.avg_ev),
+                              ("avg_wb", self.avg_wb),
+                              ("hist_ev", self.histo_ev),
+                              ("wb_red", self.wb_red),
+                              ("wb_blue", self.wb_blue)])
         return config
 
     def set_config(self, dico):
@@ -503,16 +503,19 @@ class Analyzer(threading.Thread):
                 pos_g = numpy.where(csg >= pos)[0][0]
                 pos_b = numpy.where(csb >= pos)[0][0]
             except IndexError as e:
-                logger.error(e)
-                self.queue.task_done()
-                continue
+                logger.error("no awb %s, exposure to low ",e)
+                #self.queue.task_done()
+                #continue
+                pos_r = numpy.where(histo[1])[0][-1]
+                pos_g = numpy.where(histo[2])[0][-1]
+                pos_b = numpy.where(histo[3])[0][-1]
             rg, bg = frame.camera_meta.get("awb_gains", (1.0, 1.0))
-            if rg ==0.0: 
+            if rg == 0.0: 
                 rg = 1.0
-            if bg ==0.0: 
+            if bg == 0.0: 
                 bg = 1.0
             try:
-                awb = GainRedBlue(1.0 * rg * pos_g / pos_r, 1.0 * bg * pos_g / pos_b)
+                awb = GainRedBlue(min(8,1.0 * rg * pos_g / pos_r), min(8,1.0 * bg * pos_g / pos_b))
             except ZeroDivisionError:
                 awb = GainRedBlue(rg, bg)
             now = time.time()
