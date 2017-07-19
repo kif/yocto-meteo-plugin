@@ -76,7 +76,6 @@ class Trajectory(object):
         self.servo_tilt = servo.tilt
         self.servo_pan = servo.pan
         self.default_pos = Position(0, 0)
-        
         if json_file:
             self.load_config(json_file)
         self.goto_pos(self.default_pos)
@@ -169,6 +168,7 @@ class TimeLaps(threading.Thread):
         self.pool_size_analyzer = 2
         self.pool_of_savers = []
         self.pool_size_savers = 2
+        self.do_analysis = True
         self.camera_queue = Queue()
         self.analysis_queue = Queue()
         self.saving_queue = Queue()
@@ -242,6 +242,8 @@ class TimeLaps(threading.Thread):
                 self.camera.set_config(dico["camera"])
             self.delay = dico.get("delay", self.delay)
             self.folder = dico.get("folder", self.folder)
+            self.do_analysis = dico.get("do_analysis", self.do_analysis)
+            self.camera.set_analysis(self.do_analysis)
             
     def save_config(self, index=None):
         if index is not None:
@@ -254,6 +256,7 @@ class TimeLaps(threading.Thread):
         dico = OrderedDict([                           
                             ("delay", self.delay),
                             ("folder", self.folder),
+                            ("do_analysis", self.do_analysis),
                             ("trajectory", self.trajectory.config),
                             ("camera", camera_config),
                             ])
@@ -262,11 +265,12 @@ class TimeLaps(threading.Thread):
 
     def run(self):
         "Actually does the timelaps"
-        
+        self.camera.set_analysis(self.do_analysis)
         while not self.quit_event.is_set():
             frame = self.camera_queue.get()
             frame.position = self.position
-            self.analysis_queue.put(frame)
+            if self.do_analysis:
+                self.analysis_queue.put(frame)
             if self.position not in self.storage:
                 self.storage[self.position] = deque(maxlen=self.storage_maxlen) 
             self.storage[self.position].append(frame) 

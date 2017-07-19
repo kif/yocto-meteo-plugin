@@ -289,6 +289,14 @@ class Camera(threading.Thread):
         self.avg_ev = dico.get("avg_ev", self.avg_ev)
         self.avg_wb = dico.get("avg_wb", self.avg_wb)
 
+    def set_analysis(self, do_analysis):
+        if do_analysis:
+            self.camera.awb_mode = "off" # "auto"
+            self.camera.exposure_mode = "off" #night" #"auto"
+        else:
+            self.camera.awb_mode = "auto"
+            self.camera.exposure_mode = "auto"
+        
     def get_metadata(self):
         metadata = {"iso": float(self.camera.iso),
                     "analog_gain": float(self.camera.analog_gain),
@@ -330,8 +338,8 @@ class Camera(threading.Thread):
 
     def run(self):
         "main thread activity"
-        self.camera.awb_mode = "off" # "auto"
-        self.camera.exposure_mode = "off" #night" #"auto"
+        #self.camera.awb_mode = "off" # "auto"
+        #self.camera.exposure_mode = "off" #night" #"auto"
         self._done_recording.clear()
         for foo in self.camera.capture_continuous(self.stream, format='yuv'):
             self._done_recording.set()
