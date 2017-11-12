@@ -5,7 +5,7 @@ import Adafruit_PCA9685
 pwm = Adafruit_PCA9685.PCA9685()
 # Set frequency to 50hz, good for servos.
 # gives a period of 20ms/cycle
-FREQ = 300
+FREQ = 330
 RESOLUTION = 4096
 pwm.set_pwm_freq(FREQ)
 
