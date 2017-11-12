@@ -427,7 +427,8 @@ class Saver(threading.Thread):
                                         ("summed", 1)))
                 exposure_speed = frame.camera_meta.get("exposure_speed", 1)
                 RGB16 = frame.rgb
-                if exposure_speed > 5e5/frame.camera_meta.get("framerate"):
+                if exposure_speed > 62000.0: #1/16 seconde
+                #2e5/frame.camera_meta.get("framerate"):
                     while frames:
                         other = frames.pop()
                         #merge in linear RGB space
