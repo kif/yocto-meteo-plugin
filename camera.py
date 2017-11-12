@@ -80,6 +80,7 @@ class Frame(object):
         self.camera_meta = {}
         self.gravity = None
         self.position = None
+        self.servo_status = None
         self.sem = threading.Semaphore()
         self._yuv = None
         self._rgb = None
@@ -460,6 +461,8 @@ class Saver(threading.Thread):
                     comments["gy"] = frame.gravity.y
                     comments["gz"] = frame.gravity.z
                 comments.update(frame.camera_meta)
+                if frame.servo_status:
+                    comments.update(frame.servo_status)
                 exif.comment = json.dumps(comments)
                 exif.write(preserve_timestamps=True)
             self.queue.task_done()

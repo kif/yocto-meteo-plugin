@@ -1,7 +1,7 @@
 #!/usr/bin/python
 from __future__ import division
 import Adafruit_PCA9685
-
+from collections import OrderedDict
 pwm = Adafruit_PCA9685.PCA9685()
 # Set frequency to 50hz, good for servos.
 # gives a period of 20ms/cycle
@@ -26,6 +26,8 @@ class Servo(object):
         self.pin = pin
         self.offset = offset
         self.reverse = reverse
+        self.angle_req = None
+        self.angle_set = None
         angles = list(self.SPEC.keys())
         amax = max(angles)
         amin = min(angles)
@@ -34,15 +36,30 @@ class Servo(object):
         tickmin = self.SPEC[amin] / tick
         self.slope = (tickmax - tickmin) / (amax - amin)
         self.inter = tickmin - amin * self.slope 
+        
 
     def move(self, angle):
-        ticks = self.calc(angle)
-        pwm.set_pwm(self.pin, 0, int(round(ticks)))
-
+        "Set the servo motor to the given angle in degree"
+        ticks = int(round(self.calc(angle)))
+        pwm.set_pwm(self.pin, 0, ticks)
+        self.angle_req = angle
+        angle_set = (ticks - self.inter) / self.slope + self.offset
+        self.angle_set = -angle_set if self.reverse else angle_set
+    
+    def get_config(self):
+        res = OrderedDict([("name", self.__class__.__name__),
+                           ("requested", self.angle_req),
+                           ("set", self.angle_set)])
+        return res
+        
     def off(self):
+        "switch off the servo"
         pwm.set_pwm(self.pin, 0, 0)
+        self.angle_req = None
+        self.angle_set = None
 
     def calc(self, angle):
+        "calculate the number of ticks for a requested angle"
         if self.reverse:
             angle=-angle
         if self.offset:
@@ -52,7 +69,7 @@ class Servo(object):
             angles = list(self.SPEC.keys())
             angle = max(angle, min(angles))
             angle = min(angle, max(angles))
-        return int(round(self.inter + self.slope*angle))
+        return (self.inter + self.slope*angle)
 
 
 SG90 = Servo

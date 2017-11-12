@@ -126,6 +126,9 @@ class Trajectory(object):
         #self.servo_pan.off()
         self.accelero.resume()
         self.camera.resume()
+        res = OrderedDict([("pan", self.servo_pan.get_config()),
+                           ("tilt", self.servo_tilt.get_config())])
+        return res
  
     def calc_pos(self, when):
         """Calculate the position it need to be at a given timestamp"""
@@ -168,7 +171,7 @@ class TimeLaps(threading.Thread):
         self.pool_size_analyzer = 2
         self.pool_of_savers = []
         self.pool_size_savers = 2
-        self.do_analysis = True
+        self.do_analysis = False#True
         self.camera_queue = Queue()
         self.analysis_queue = Queue()
         self.saving_queue = Queue()
@@ -186,6 +189,7 @@ class TimeLaps(threading.Thread):
         self.accelero = Accelerometer() 
         self.accelero.start()
         self.folder = folder
+        self.servo_status = None
         
         self.camera = Camera(resolution=resolution,                              
                              framerate = framerate,
@@ -269,6 +273,7 @@ class TimeLaps(threading.Thread):
         while not self.quit_event.is_set():
             frame = self.camera_queue.get()
             frame.position = self.position
+            frame.servo_status = self.servo_status
             if self.do_analysis:
                 self.analysis_queue.put(frame)
             if self.position not in self.storage:
@@ -280,7 +285,7 @@ class TimeLaps(threading.Thread):
                 self.next_img = frame.timestamp + self.delay
                 next_pos = self.trajectory.calc_pos(self.next_img - self.start_time)
                 if next_pos != self.position:
-                    self.trajectory.goto_pos(next_pos)
+                    self.servo_status = self.trajectory.goto_pos(next_pos)
                     self.position = next_pos
             self.camera_queue.task_done()
             logger.info("Frame #%04i. Length of queues: camera %i, analysis %i saving %i config %i", 
