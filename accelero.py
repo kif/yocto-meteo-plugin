@@ -95,7 +95,7 @@ if __name__ == "__main__":
     while True:
         i+=1
         grav = acc.get()
-        print(grav, 180.0 * atan2(-grav.y, -grav.z) / pi, 180.0 * atan2(-grav.x, -grav.z) / pi)
+        print("Tilt %6.3f Yaw %6.3f %s"%(180.0 * atan2(-grav.y, -grav.z) / pi, 180.0 * atan2(-grav.x, -grav.z) / pi, grav))
         if i%10==0:
             print("pause")
             acc.pause()
